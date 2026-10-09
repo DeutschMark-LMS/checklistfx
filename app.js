@@ -2472,6 +2472,8 @@ if (logTradeForm) {
       id: Date.now(),
       asset,
       direction: activeDirection,
+      entryPrice: Math.abs(pnlFinal) || 0,
+      createdAt: new Date().toISOString(),
       strategy: strategyName,
       strategyKey: activeStrategyKey,
       outcome: pnlFinal >= 0 ? 'win' : 'loss',

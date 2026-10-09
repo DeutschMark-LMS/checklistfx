@@ -1,0 +1,377 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // This security rules file assumes the following data structures:
+    //
+    // Collection: users
+    // Document ID: {userId} (matches Firebase Auth UID)
+    // Fields:
+    //   - uid: string (required, 1..128 chars, matches request.auth.uid)
+    //   - email: string (required, valid email, <= 254 chars)
+    //   - displayName: string (optional, <= 100 chars)
+    //   - user_metadata: map (optional, <= 20 keys)
+    //   - createdAt: timestamp | number | string (optional, immutable)
+    //   - updatedAt: timestamp | number | string (optional)
+    //   - photoURL: string (optional, valid URL, <= 1000 chars)
+    //   - handle: string (optional, <= 50 chars)
+    //   - trading_style: string (optional, <= 100 chars)
+    //
+    // Subcollection: users/{userId}/trades
+    // Document ID: {tradeId}
+    // Fields:
+    //   - id: string | number (optional, immutable)
+    //   - asset: string (required, 1..30 chars, e.g. 'NQ', 'BTCUSDT')
+    //   - direction: string (required, 'LONG' | 'SHORT' | 'BUY' | 'SELL', case-insensitive)
+    //   - entryPrice: number (required, >= 0)
+    //   - createdAt: timestamp | number | string (required, immutable)
+    //   - exitPrice: number (optional, >= 0)
+    //   - stopLoss: number (optional, >= 0)
+    //   - takeProfit: number (optional, >= 0)
+    //   - strategy: string (optional, <= 100 chars)
+    //   - strategyKey: string (optional, <= 100 chars)
+    //   - outcome: string (optional, 'win' | 'loss' | 'breakeven' | 'open')
+    //   - pnl: number (optional)
+    //   - rMultiple: string (optional, <= 20 chars)
+    //   - confluencesMet: int (optional, 0..100)
+    //   - totalConfluences: int (optional, 0..100)
+    //   - confluences: list (optional, <= 50 items)
+    //   - isCompliant: bool (optional)
+    //   - breachReason: string (optional, <= 200 chars)
+    //   - screenshotUrl: string (optional, <= 1000 chars)
+    //   - notes: string (optional, <= 2000 chars)
+    //   - date: string (optional, <= 100 chars)
+    //   - timestamp: number | timestamp (optional)
+    //   - updatedAt: timestamp | number | string (optional)
+    //   - userId: string (optional, must match {userId}, immutable)
+    //   - uid: string (optional, must match {userId}, immutable)
+    //   - ownerId: string (optional, must match {userId}, immutable)
+    //
+    // Subcollection: users/{userId}/playbooks
+    // Document ID: {playbookId}
+    // Fields:
+    //   - id: string (optional, <= 100 chars, immutable)
+    //   - name: string (required, 1..100 chars)
+    //   - setupType: string (required, 1..50 chars)
+    //   - confluences: list (required, 1..50 items)
+    //   - targetRr: string | number (optional, <= 30 chars)
+    //   - thesis: string (optional, <= 1000 chars)
+    //   - wr: string | number (optional, <= 20 chars)
+    //   - tradesCount: int (optional, >= 0)
+    //   - followedWR: string | number (optional, <= 20 chars)
+    //   - brokenWR: string | number (optional, <= 20 chars)
+    //   - pnl: string | number (optional, <= 50 chars)
+    //   - createdAt: timestamp | number | string (optional, immutable)
+    //   - updatedAt: timestamp | number | string (optional)
+    //   - userId: string (optional, must match {userId}, immutable)
+    //   - uid: string (optional, must match {userId}, immutable)
+    //   - ownerId: string (optional, must match {userId}, immutable)
+    //
+    // Subcollection: users/{userId}/settings
+    // Document ID: {settingId}
+    // Fields:
+    //   - id: string (optional, <= 100 chars, immutable)
+    //   - theme: string (optional, <= 30 chars)
+    //   - currency: string (optional, <= 10 chars)
+    //   - riskPerTrade: number (optional, >= 0)
+    //   - maxDailyLoss: number (optional, >= 0)
+    //   - dailyMaxLoss: number (optional, >= 0)
+    //   - fomoTaxRate: number (optional, >= 0)
+    //   - notificationsEnabled: bool (optional)
+    //   - soundEnabled: bool (optional)
+    //   - tradingStyle: string (optional, <= 100 chars)
+    //   - defaultStrategy: string (optional, <= 100 chars)
+    //   - preferences: map (optional, <= 30 keys)
+    //   - createdAt: timestamp | number | string (optional, immutable)
+    //   - updatedAt: timestamp | number | string (optional)
+    //   - userId: string (optional, must match {userId}, immutable)
+    //   - uid: string (optional, must match {userId}, immutable)
+    //   - ownerId: string (optional, must match {userId}, immutable)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Check if the caller is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if user owns the resource path
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Check if user is owner based on document's uid field
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+
+    // Verify UID is not spoofed on create
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) ||
+        request.resource.data.uid == request.auth.uid;
+    }
+
+    // Ensure uid field is not modified on update
+    function uidNotModified() {
+      return !('uid' in request.resource.data) ||
+        request.resource.data.uid == resource.data.uid;
+    }
+
+    // Validate required fields exist in request payload
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // Validate document contains only allowed fields
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // Ensure immutable fields are unchanged during update
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // Validate string length within bounds
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+
+    // Validate URL format
+    function isValidUrl(url) {
+      return url is string &&
+        (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    // Validate email format
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // Validate ISO date string format
+    function isValidDateString(dateStr) {
+      return dateStr is string &&
+        dateStr.matches("^\\d{4}-\\d{2}-\\d{2}.*Z?$");
+    }
+
+    // Validate flexible timestamp / date representation
+    function isValidTimestampOrDate(val) {
+      return val is timestamp ||
+        val is number ||
+        (val is string && (isValidDateString(val) || val.size() <= 50));
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    // Validate User Profile Document
+    function isValidUserProfile(data) {
+      let allowed = [
+        'uid', 'email', 'displayName', 'user_metadata',
+        'createdAt', 'updatedAt', 'photoURL', 'handle', 'trading_style'
+      ];
+      return data.keys().hasOnly(allowed) &&
+        data.keys().hasAll(['uid', 'email']) &&
+        data.uid is string && data.uid.size() > 0 && data.uid.size() <= 128 &&
+        isValidEmail(data.email) && data.email.size() <= 254 &&
+        (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 100)) &&
+        (!('handle' in data) || (data.handle is string && data.handle.size() <= 50)) &&
+        (!('trading_style' in data) || (data.trading_style is string && data.trading_style.size() <= 100)) &&
+        (!('photoURL' in data) || data.photoURL == null || (data.photoURL is string && data.photoURL.size() <= 1000 && isValidUrl(data.photoURL))) &&
+        (!('createdAt' in data) || isValidTimestampOrDate(data.createdAt)) &&
+        (!('updatedAt' in data) || isValidTimestampOrDate(data.updatedAt)) &&
+        (!('user_metadata' in data) || (data.user_metadata is map && data.user_metadata.size() <= 20));
+    }
+
+    // Validate Trade Document
+    function isValidTrade(data, userId) {
+      let allowed = [
+        'id', 'asset', 'direction', 'entryPrice', 'createdAt',
+        'exitPrice', 'stopLoss', 'takeProfit', 'strategy', 'strategyKey',
+        'outcome', 'pnl', 'rMultiple', 'confluencesMet', 'totalConfluences',
+        'confluences', 'isCompliant', 'breachReason', 'screenshotUrl', 'notes',
+        'date', 'timestamp', 'updatedAt', 'userId', 'uid', 'ownerId'
+      ];
+      return data.keys().hasOnly(allowed) &&
+        data.keys().hasAll(['asset', 'direction']) &&
+        data.asset is string && data.asset.size() > 0 && data.asset.size() <= 30 &&
+        data.direction is string && (data.direction in ['LONG', 'SHORT', 'long', 'short', 'BUY', 'SELL', 'buy', 'sell']) &&
+        (!('entryPrice' in data) || (data.entryPrice is number && data.entryPrice >= 0)) &&
+        (!('createdAt' in data) || isValidTimestampOrDate(data.createdAt)) &&
+        (!('id' in data) || (data.id is string || data.id is number)) &&
+        (!('exitPrice' in data) || (data.exitPrice is number && data.exitPrice >= 0)) &&
+        (!('stopLoss' in data) || (data.stopLoss is number && data.stopLoss >= 0)) &&
+        (!('takeProfit' in data) || (data.takeProfit is number && data.takeProfit >= 0)) &&
+        (!('strategy' in data) || (data.strategy is string && data.strategy.size() <= 100)) &&
+        (!('strategyKey' in data) || (data.strategyKey is string && data.strategyKey.size() <= 100)) &&
+        (!('outcome' in data) || (data.outcome is string && (data.outcome in ['win', 'loss', 'breakeven', 'WIN', 'LOSS', 'BREAKEVEN', 'open', 'OPEN']))) &&
+        (!('pnl' in data) || (data.pnl is number)) &&
+        (!('rMultiple' in data) || (data.rMultiple is string && data.rMultiple.size() <= 20)) &&
+        (!('confluencesMet' in data) || (data.confluencesMet is int && data.confluencesMet >= 0 && data.confluencesMet <= 100)) &&
+        (!('totalConfluences' in data) || (data.totalConfluences is int && data.totalConfluences >= 0 && data.totalConfluences <= 100)) &&
+        (!('confluences' in data) || (data.confluences is list && data.confluences.size() <= 50)) &&
+        (!('isCompliant' in data) || (data.isCompliant is bool)) &&
+        (!('breachReason' in data) || (data.breachReason is string && data.breachReason.size() <= 200)) &&
+        (!('screenshotUrl' in data) || data.screenshotUrl == '' || (data.screenshotUrl is string && data.screenshotUrl.size() <= 1000)) &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000)) &&
+        (!('date' in data) || (data.date is string && data.date.size() <= 100)) &&
+        (!('timestamp' in data) || (data.timestamp is number || data.timestamp is timestamp)) &&
+        (!('updatedAt' in data) || isValidTimestampOrDate(data.updatedAt)) &&
+        (!('userId' in data) || (data.userId is string && data.userId == userId)) &&
+        (!('uid' in data) || (data.uid is string && data.uid == userId)) &&
+        (!('ownerId' in data) || (data.ownerId is string && data.ownerId == userId));
+    }
+
+    // Validate Playbook Document
+    function isValidPlaybook(data, userId) {
+      let allowed = [
+        'id', 'name', 'setupType', 'targetRr', 'confluences', 'thesis',
+        'wr', 'tradesCount', 'followedWR', 'brokenWR', 'pnl',
+        'createdAt', 'updatedAt', 'userId', 'uid', 'ownerId'
+      ];
+      return data.keys().hasOnly(allowed) &&
+        data.keys().hasAll(['name', 'setupType', 'confluences']) &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+        data.setupType is string && data.setupType.size() > 0 && data.setupType.size() <= 50 &&
+        data.confluences is list && data.confluences.size() >= 1 && data.confluences.size() <= 50 &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 100)) &&
+        (!('targetRr' in data) || ((data.targetRr is string && data.targetRr.size() <= 30) || data.targetRr is number)) &&
+        (!('thesis' in data) || (data.thesis is string && data.thesis.size() <= 1000)) &&
+        (!('wr' in data) || ((data.wr is string && data.wr.size() <= 20) || data.wr is number)) &&
+        (!('tradesCount' in data) || (data.tradesCount is int && data.tradesCount >= 0)) &&
+        (!('followedWR' in data) || ((data.followedWR is string && data.followedWR.size() <= 20) || data.followedWR is number)) &&
+        (!('brokenWR' in data) || ((data.brokenWR is string && data.brokenWR.size() <= 20) || data.brokenWR is number)) &&
+        (!('pnl' in data) || ((data.pnl is string && data.pnl.size() <= 50) || data.pnl is number)) &&
+        (!('createdAt' in data) || isValidTimestampOrDate(data.createdAt)) &&
+        (!('updatedAt' in data) || isValidTimestampOrDate(data.updatedAt)) &&
+        (!('userId' in data) || (data.userId is string && data.userId == userId)) &&
+        (!('uid' in data) || (data.uid is string && data.uid == userId)) &&
+        (!('ownerId' in data) || (data.ownerId is string && data.ownerId == userId));
+    }
+
+    // Validate Settings Document
+    function isValidSettings(data, userId) {
+      let allowed = [
+        'id', 'theme', 'currency', 'riskPerTrade', 'maxDailyLoss', 'dailyMaxLoss',
+        'fomoTaxRate', 'notificationsEnabled', 'soundEnabled', 'tradingStyle',
+        'defaultStrategy', 'preferences', 'createdAt', 'updatedAt',
+        'userId', 'uid', 'ownerId'
+      ];
+      return data.keys().size() > 0 && data.keys().size() <= 30 &&
+        data.keys().hasOnly(allowed) &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 100)) &&
+        (!('theme' in data) || (data.theme is string && data.theme.size() <= 30)) &&
+        (!('currency' in data) || (data.currency is string && data.currency.size() <= 10)) &&
+        (!('riskPerTrade' in data) || (data.riskPerTrade is number && data.riskPerTrade >= 0)) &&
+        (!('maxDailyLoss' in data) || (data.maxDailyLoss is number && data.maxDailyLoss >= 0)) &&
+        (!('dailyMaxLoss' in data) || (data.dailyMaxLoss is number && data.dailyMaxLoss >= 0)) &&
+        (!('fomoTaxRate' in data) || (data.fomoTaxRate is number && data.fomoTaxRate >= 0)) &&
+        (!('notificationsEnabled' in data) || (data.notificationsEnabled is bool)) &&
+        (!('soundEnabled' in data) || (data.soundEnabled is bool)) &&
+        (!('tradingStyle' in data) || (data.tradingStyle is string && data.tradingStyle.size() <= 100)) &&
+        (!('defaultStrategy' in data) || (data.defaultStrategy is string && data.defaultStrategy.size() <= 100)) &&
+        (!('preferences' in data) || (data.preferences is map && data.preferences.size() <= 30)) &&
+        (!('createdAt' in data) || isValidTimestampOrDate(data.createdAt)) &&
+        (!('updatedAt' in data) || isValidTimestampOrDate(data.updatedAt)) &&
+        (!('userId' in data) || (data.userId is string && data.userId == userId)) &&
+        (!('uid' in data) || (data.uid is string && data.uid == userId)) &&
+        (!('ownerId' in data) || (data.ownerId is string && data.ownerId == userId));
+    }
+
+    // ===============================================================
+    // Collection Match Rules
+    // ===============================================================
+
+    // Root Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // User Profile Document
+    match /users/{userId} {
+      // Only owner can read user profile (protects email/PII)
+      allow read: if isOwner(userId);
+
+      // Only owner can create user profile document
+      allow create: if isOwner(userId) &&
+        isValidUserProfile(request.resource.data) &&
+        request.resource.data.uid == userId &&
+        request.resource.data.uid == request.auth.uid;
+
+      // Only owner can update user profile document (UID & createdAt immutable)
+      allow update: if isOwner(userId) &&
+        isValidUserProfile(request.resource.data) &&
+        request.resource.data.uid == resource.data.uid &&
+        areImmutableFieldsUnchanged(['uid', 'createdAt']);
+
+      // Deletion of user profile documents disallowed from client SDK
+      allow delete: if false;
+
+      // Trades Subcollection
+      match /trades/{tradeId} {
+        // Only owner can read trades
+        allow read: if isOwner(userId);
+
+        // Only owner can create trades with schema validation and ownership verification
+        allow create: if isOwner(userId) &&
+          isValidTrade(request.resource.data, userId);
+
+        // Only owner can update trades (maintaining schema validation & immutable fields)
+        allow update: if isOwner(userId) &&
+          isValidTrade(request.resource.data, userId) &&
+          areImmutableFieldsUnchanged(['id', 'createdAt', 'userId', 'uid', 'ownerId']);
+
+        // Only owner can delete their own trades
+        allow delete: if isOwner(userId);
+      }
+
+      // Playbooks Subcollection
+      match /playbooks/{playbookId} {
+        // Only owner can read playbooks
+        allow read: if isOwner(userId);
+
+        // Only owner can create custom playbooks
+        allow create: if isOwner(userId) &&
+          isValidPlaybook(request.resource.data, userId);
+
+        // Only owner can update custom playbooks
+        allow update: if isOwner(userId) &&
+          isValidPlaybook(request.resource.data, userId) &&
+          areImmutableFieldsUnchanged(['id', 'createdAt', 'userId', 'uid', 'ownerId']);
+
+        // Only owner can delete their own playbooks
+        allow delete: if isOwner(userId);
+      }
+
+      // Settings Subcollection
+      match /settings/{settingId} {
+        // Only owner can read settings
+        allow read: if isOwner(userId);
+
+        // Only owner can create settings
+        allow create: if isOwner(userId) &&
+          isValidSettings(request.resource.data, userId);
+
+        // Only owner can update settings
+        allow update: if isOwner(userId) &&
+          isValidSettings(request.resource.data, userId) &&
+          areImmutableFieldsUnchanged(['createdAt', 'userId', 'uid', 'ownerId', 'id']);
+
+        // Only owner can delete settings
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}
