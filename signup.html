@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Sign Up | Checklist</title>
+  <meta name="theme-color" content="#09090b">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css">
+  <!-- Firebase Auth SDK (v12) -->
+  <script type="module" src="firebaseClient.js"></script>
+  <script src="app.js" defer></script>
+</head>
+<body class="auth-page">
+
+  <div class="auth-container">
+    <a href="index.html" class="auth-logo" data-route="index.html">
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+      <span>Checklist</span>
+    </a>
+    
+    <div class="auth-card">
+      <div class="auth-header">
+        <h1>Create an account</h1>
+        <p>Start tracking your confluences today.</p>
+      </div>
+
+      <!-- Live Feedback Alert Banner -->
+      <div id="auth-alert" class="auth-alert hidden"></div>
+      
+      <button type="button" class="btn btn-ghost btn-block auth-social-btn" id="google-signup-btn">
+        <svg viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+        Sign up with Google
+      </button>
+
+      <div class="auth-divider"><span>or continue with email</span></div>
+
+      <form class="auth-form" id="signup-form" action="#">
+        <div class="form-group">
+          <label for="name">Full Name</label>
+          <input type="text" id="name" placeholder="Jason Trader" required autocomplete="name">
+        </div>
+        
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" placeholder="trader@example.com" required autocomplete="email">
+        </div>
+        
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="Create a strong password (min 6 chars)" required minlength="6" autocomplete="new-password">
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block" id="signup-submit-btn">
+          <span id="signup-btn-text">Create account</span>
+          <span id="signup-btn-spinner" class="btn-spinner hidden"></span>
+        </button>
+      </form>
+      
+      <p class="auth-footer">Already have an account? <a href="login.html">Log in</a></p>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const signupForm = document.getElementById('signup-form');
+      const nameInput = document.getElementById('name');
+      const emailInput = document.getElementById('email');
+      const passwordInput = document.getElementById('password');
+      const alertBox = document.getElementById('auth-alert');
+      const submitBtn = document.getElementById('signup-submit-btn');
+      const btnText = document.getElementById('signup-btn-text');
+      const btnSpinner = document.getElementById('signup-btn-spinner');
+      const googleBtn = document.getElementById('google-signup-btn');
+
+      function showAlert(msg, type = 'error') {
+        if (!alertBox) return;
+        alertBox.textContent = msg;
+        alertBox.className = `auth-alert ${type}`;
+      }
+
+      function hideAlert() {
+        if (!alertBox) return;
+        alertBox.className = 'auth-alert hidden';
+      }
+
+      function setLoading(loading) {
+        if (submitBtn) submitBtn.disabled = loading;
+        if (btnText) btnText.textContent = loading ? 'Creating account...' : 'Create account';
+        if (btnSpinner) btnSpinner.classList.toggle('hidden', !loading);
+      }
+
+      if (signupForm) {
+        signupForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          hideAlert();
+          const fullName = nameInput.value.trim();
+          const email = emailInput.value.trim();
+          const password = passwordInput.value;
+
+          if (!email || !password) {
+            showAlert('Please complete all required fields.');
+            return;
+          }
+
+          if (password.length < 6) {
+            showAlert('Password must be at least 6 characters.');
+            return;
+          }
+
+          setLoading(true);
+
+          if (window.DMA_AUTH) {
+            const { data, error } = await window.DMA_AUTH.signUp({ email, password, fullName });
+            setLoading(false);
+
+            if (error) {
+              const msg = error.message || 'Failed to create account.';
+              showAlert(msg, 'error');
+            } else {
+              if (data && (data.user || data.session)) {
+                // Initialize clean ledger state for fresh user
+                localStorage.setItem('dma_include_sample_data', 'false');
+                localStorage.setItem('dma_trades', '[]');
+                localStorage.setItem('dma_custom_playbooks', '[]');
+                localStorage.setItem('dma_deleted_playbooks', '[]');
+                showAlert('Account created successfully! Redirecting...', 'success');
+                setTimeout(() => {
+                  window.location.href = 'app.html';
+                }, 400);
+              } else {
+                showAlert('Account created! Please check your email or log in.', 'success');
+                signupForm.reset();
+              }
+            }
+          } else {
+            // Local fallback
+            localStorage.setItem('dma_include_sample_data', 'false');
+            localStorage.setItem('dma_trades', '[]');
+            localStorage.setItem('dma_custom_playbooks', '[]');
+            localStorage.setItem('dma_deleted_playbooks', '[]');
+            localStorage.setItem('checklist-auth', 'true');
+            window.location.href = 'app.html';
+          }
+        });
+      }
+
+      if (googleBtn) {
+        googleBtn.addEventListener('click', async () => {
+          showAlert('Connecting to Google...', 'info');
+          // Ensure fresh user starts with clean slate (sample data OFF, empty trades & playbooks)
+          localStorage.setItem('dma_include_sample_data', 'false');
+          localStorage.setItem('dma_trades', '[]');
+          localStorage.setItem('dma_custom_playbooks', '[]');
+          localStorage.setItem('dma_deleted_playbooks', '[]');
+
+          if (window.DMA_AUTH) {
+            const res = await window.DMA_AUTH.signInWithGoogle();
+            if (res && res.error) {
+              showAlert(res.error.message || 'Google sign-up was cancelled or failed.', 'error');
+            }
+          } else {
+            const mockUser = {
+              id: 'google-usr-' + Date.now(),
+              email: 'trader.google@gmail.com',
+              user_metadata: { full_name: 'Google Trader', handle: '@googletrader', trading_style: 'Momentum + Breakout' }
+            };
+            localStorage.setItem('checklist-auth', 'true');
+            localStorage.setItem('dma_user', JSON.stringify(mockUser));
+            localStorage.setItem('dma_active_user', JSON.stringify(mockUser));
+            window.location.href = 'app.html';
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>

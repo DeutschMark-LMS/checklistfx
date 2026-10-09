@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Profile | Checklist</title>
+  <meta name="theme-color" content="#09090b">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+  <!-- Firebase Auth SDK (v12) -->
+  <script type="module" src="firebaseClient.js"></script>
+  <script src="app.js" defer></script>
+  <script src="guardian.js"></script>
+</head>
+<body class="app-body profile-page">
+  <header class="app-header profile-header">
+    <button class="icon-btn" aria-label="Back" data-route="app.html">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+    </button>
+
+    <div class="app-logo profile-title-wrap">
+      <span class="profile-title">Profile</span>
+    </div>
+
+    <button class="icon-btn" aria-label="Settings" data-route="profile.html#settings">
+      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.86l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.15V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9.4 19.4a1.7 1.7 0 0 0-1-.6 1.7 1.7 0 0 0-1.15.4l-.06.06A2 2 0 1 1 4.36 16.4l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.15-.4H2.76a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0 .4-1.15V7.76a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 9.4 9a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.15V7.16a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 14.6 9a1.7 1.7 0 0 0 1 .6 1.7 1.7 0 0 0 1.15-.4l.06-.06A2 2 0 1 1 19.64 11.6l-.06.06A1.7 1.7 0 0 0 19.4 13c.2.3.31.66.31 1.02s-.11.72-.31 1.02z"></path></svg>
+    </button>
+  </header>
+
+  <main class="app-main profile-main">
+    <section class="profile-card">
+      <div class="profile-avatar" id="profile-avatar">JT</div>
+      <div class="profile-meta">
+        <h2 id="profile-name-display">Jason Trader</h2>
+        <p id="profile-email-display">@jasondma</p>
+      </div>
+    </section>
+
+    <section class="profile-stats">
+      <div class="mini-stat">
+        <span class="label">Win Rate</span>
+        <strong>62%</strong>
+      </div>
+      <div class="mini-stat">
+        <span class="label">Trades</span>
+        <strong>184</strong>
+      </div>
+      <div class="mini-stat">
+        <span class="label">Best Setup</span>
+        <strong>A+</strong>
+      </div>
+    </section>
+
+    <button class="btn btn-ghost btn-block profile-edit-btn" data-action="open-profile-editor">Edit profile</button>
+
+    <section class="settings-panel" id="settings">
+      <div class="panel-header">
+        <h3>Settings</h3>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <span class="setting-title">Notifications</span>
+          <small>Trade alerts and checklist reminders</small>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <span class="setting-title">Dark mode</span>
+          <small>Always on</small>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <span class="setting-title">Risk reminders</span>
+          <small>Before execution</small>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <span class="setting-title">Demo / Sample Trades</span>
+          <small>Show sample benchmark trades in Journal & Analytics</small>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-sample-data" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-row compact">
+        <div>
+          <span class="setting-title">Timezone</span>
+          <small>America/New_York</small>
+        </div>
+      </div>
+
+      <div class="setting-row compact">
+        <div>
+          <span class="setting-title">Trading style</span>
+          <small>Momentum + Breakout</small>
+        </div>
+      </div>
+    </section>
+
+    <!-- Subscription & Billing -->
+    <section class="settings-panel" id="subscription">
+      <div class="panel-header">
+        <h3>Subscription & Billing</h3>
+      </div>
+      <div class="setting-row compact">
+        <div>
+          <span class="setting-title">Current Plan</span>
+          <small>Free Tier</small>
+        </div>
+        <span style="color: var(--success); font-weight: 800; font-size: 0.85rem; background: rgba(16, 185, 129, 0.15); padding: 0.2rem 0.6rem; border-radius: 4px;">ACTIVE</span>
+      </div>
+      <div class="setting-row compact">
+        <div>
+          <span class="setting-title">Upgrade to Pro</span>
+          <small>Unlock unlimited checklists and deep analytics</small>
+        </div>
+        <button class="btn btn-primary btn-sm">Upgrade</button>
+      </div>
+    </section>
+
+    <!-- Security -->
+    <section class="settings-panel" id="security">
+      <div class="panel-header">
+        <h3>Security</h3>
+      </div>
+      <div class="setting-row compact">
+        <div>
+          <span class="setting-title">Password</span>
+          <small>Last changed 3 months ago</small>
+        </div>
+        <button class="btn btn-ghost btn-sm">Change</button>
+      </div>
+      <div class="setting-row">
+        <div>
+          <span class="setting-title">Two-Factor Auth (2FA)</span>
+          <small>Secure your account with an authenticator app</small>
+        </div>
+        <label class="toggle">
+          <input type="checkbox">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </section>
+
+    <button type="button" class="btn btn-ghost btn-block profile-logout" id="profile-logout-btn" style="margin-top: 1rem; color: var(--danger); border-color: rgba(244, 63, 94, 0.3); width: 100%; cursor: pointer;">Log out</button>
+  </main>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      // 1. Sync sample data toggle switch
+      const sampleToggle = document.getElementById('toggle-sample-data');
+      if (sampleToggle) {
+        const currentPref = localStorage.getItem('dma_include_sample_data');
+        sampleToggle.checked = currentPref !== 'false';
+        sampleToggle.addEventListener('change', (e) => {
+          localStorage.setItem('dma_include_sample_data', e.target.checked ? 'true' : 'false');
+        });
+      }
+
+      // 2. Load Supabase / Active User Profile
+      if (typeof window.DMA_AUTH !== 'undefined') {
+        const user = window.DMA_AUTH.getUser();
+        if (user) {
+          const email = user.email || 'trader@dma.com';
+          const name = user.user_metadata?.full_name || email.split('@')[0] || 'Trader';
+          const initials = name.slice(0, 2).toUpperCase();
+
+          const avatarEl = document.getElementById('profile-avatar');
+          const nameEl = document.getElementById('profile-name-display');
+          const emailEl = document.getElementById('profile-email-display');
+          const inputName = document.getElementById('profile-name');
+          const inputHandle = document.getElementById('profile-handle');
+
+          if (avatarEl) avatarEl.textContent = initials;
+          if (nameEl) nameEl.textContent = name;
+          if (emailEl) emailEl.textContent = user.user_metadata?.handle ? '@' + user.user_metadata.handle : email;
+          if (inputName) inputName.value = name;
+          if (inputHandle) inputHandle.value = user.user_metadata?.handle || ('@' + email.split('@')[0]);
+        }
+
+        // 3. Handle Logout
+        const logoutBtn = document.getElementById('profile-logout-btn');
+        if (logoutBtn) {
+          logoutBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            logoutBtn.disabled = true;
+            logoutBtn.textContent = 'Logging out...';
+            await window.DMA_AUTH.signOut();
+            window.location.href = 'login.html';
+          });
+        }
+      }
+    });
+  </script>
+
+  <div class="profile-modal hidden" id="profile-modal" aria-hidden="true">
+    <div class="profile-modal-card">
+      <div class="modal-header">
+        <h3>Edit profile</h3>
+        <button type="button" class="icon-btn" data-action="close-profile-editor" aria-label="Close editor">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <div class="form-group">
+        <label for="profile-name">Display name</label>
+        <input id="profile-name" type="text" value="Jason Trader">
+      </div>
+
+      <div class="form-group">
+        <label for="profile-handle">Handle</label>
+        <input id="profile-handle" type="text" value="@jasondma">
+      </div>
+
+      <div class="form-group">
+        <label for="profile-timezone">Timezone</label>
+        <select id="profile-timezone">
+          <option selected>America/New_York</option>
+          <option>Europe/London</option>
+          <option>Asia/Tokyo</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="profile-style">Trading style</label>
+        <select id="profile-style">
+          <option selected>Momentum + Breakout</option>
+          <option>Trend Following</option>
+          <option>Reversal</option>
+          <option>Scalp</option>
+        </select>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-action="close-profile-editor">Cancel</button>
+        <button type="button" class="btn btn-primary" data-action="save-profile-editor">Save changes</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
