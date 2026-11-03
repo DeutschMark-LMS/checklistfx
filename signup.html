@@ -124,7 +124,7 @@
             } else {
               if (data && (data.user || data.session)) {
                 // Initialize clean ledger state for fresh user
-                localStorage.setItem('dma_include_sample_data', 'false');
+                localStorage.removeItem('dma_include_sample_data');
                 localStorage.setItem('dma_trades', '[]');
                 localStorage.setItem('dma_custom_playbooks', '[]');
                 localStorage.setItem('dma_deleted_playbooks', '[]');
@@ -139,7 +139,7 @@
             }
           } else {
             // Local fallback
-            localStorage.setItem('dma_include_sample_data', 'false');
+            localStorage.removeItem('dma_include_sample_data');
             localStorage.setItem('dma_trades', '[]');
             localStorage.setItem('dma_custom_playbooks', '[]');
             localStorage.setItem('dma_deleted_playbooks', '[]');
@@ -152,8 +152,8 @@
       if (googleBtn) {
         googleBtn.addEventListener('click', async () => {
           showAlert('Connecting to Google...', 'info');
-          // Ensure fresh user starts with clean slate (sample data OFF, empty trades & playbooks)
-          localStorage.setItem('dma_include_sample_data', 'false');
+          // Ensure fresh user starts with clean slate (empty trades & playbooks)
+          localStorage.removeItem('dma_include_sample_data');
           localStorage.setItem('dma_trades', '[]');
           localStorage.setItem('dma_custom_playbooks', '[]');
           localStorage.setItem('dma_deleted_playbooks', '[]');

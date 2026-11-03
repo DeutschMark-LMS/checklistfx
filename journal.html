@@ -14,7 +14,7 @@
   <!-- Firebase Auth SDK (v12) -->
   <script type="module" src="firebaseClient.js"></script>
   <script src="app.js" defer></script>
-  <script src="guardian.js"></script>
+  <script src="guardian.js" defer></script>
 </head>
 <body class="app-body">
 
@@ -91,8 +91,8 @@
           <button type="button" class="cal-today-btn" id="cal-today-btn">Current</button>
         </div>
         <div class="calendar-month-stats" id="cal-month-stats">
-          <span class="cal-stat-pill" id="cal-month-net">Month: <b>+$1,030.00</b></span>
-          <span class="cal-stat-pill" id="cal-month-discipline">Discipline: <b>67%</b></span>
+          <span class="cal-stat-pill" id="cal-month-net">Month: <b>$0.00</b></span>
+          <span class="cal-stat-pill" id="cal-month-discipline">Discipline: <b>--%</b></span>
         </div>
       </div>
 
@@ -133,20 +133,6 @@
       </button>
     </div>
 
-    <!-- Demo / Sample Data Control Bar -->
-    <div class="sample-data-control-bar" id="sample-data-control-bar">
-      <div class="sample-data-status">
-        <span class="sample-status-pill" id="sample-status-pill">
-          <span class="status-indicator-dot"></span>
-          <span id="sample-status-text">Sample Trades: Active</span>
-        </span>
-        <span class="sample-status-hint">Preloaded benchmark trades for system preview</span>
-      </div>
-      <div class="sample-data-actions">
-        <button type="button" class="btn-toggle-demo" id="toggle-sample-data-btn">Hide Sample Data</button>
-      </div>
-    </div>
-
     <!-- Search & Quick Date Scrubber -->
     <div class="journal-controls">
       <!-- Search Input -->
@@ -168,157 +154,13 @@
 
     <!-- Filter Tabs with Live Counts -->
     <div class="journal-tabs">
-      <button class="tab-btn active" data-filter="all">All Trades (<span id="count-all">3</span>)</button>
-      <button class="tab-btn" data-filter="followed">Rules Followed (<span id="count-followed">2</span>)</button>
-      <button class="tab-btn" data-filter="broken">Rules Broken (<span id="count-broken">1</span>)</button>
+      <button class="tab-btn active" data-filter="all">All Trades (<span id="count-all">0</span>)</button>
+      <button class="tab-btn" data-filter="followed">Rules Followed (<span id="count-followed">0</span>)</button>
+      <button class="tab-btn" data-filter="broken">Rules Broken (<span id="count-broken">0</span>)</button>
     </div>
 
     <!-- Trade List -->
-    <div class="trade-list" id="journal-trade-list">
-      
-      <!-- Date Group -->
-      <div class="date-group-header">
-        <span>Today</span>
-        <span class="date-group-stat">Net: <b class="green">+$790.00</b> · 2 trades</span>
-      </div>
-      
-      <!-- Trade Card 1 (Rules Followed) -->
-      <div class="trade-card followed" 
-           data-trade-id="demo-1"
-           data-asset="XAUUSD" 
-           data-direction="long" 
-           data-setup="reversal"
-           data-date="today"
-           data-time="09:32 AM"
-           data-pnl="1240"
-           data-rmult="+2.5R"
-           data-compliance="true"
-           data-confluences-met="4"
-           data-confluences-total="4"
-           data-confluences='["4H Key S/R Level swept","15M MSS with displacement candle","Order Block or FVG retest established","Strict 1:2.5 minimum R:R profile"]'
-           data-screenshot="https://www.tradingview.com/x/dma_sample/"
-           data-notes="Disciplined execution at London open. Waited for the 15M MSS candle to close before executing."
-           data-tags='["Patient", "A+ Confluence", "Zero FOMO"]'>
-        <div class="trade-header">
-          <div class="trade-asset">
-            <span class="direction long">LONG</span>
-            <span class="ticker">XAUUSD</span>
-          </div>
-          <div class="trade-pnl win">+$1,240.00</div>
-        </div>
-        <div class="trade-meta">
-          <span class="time">09:32 AM</span>
-          <span class="setup-name">A+ Reversal</span>
-        </div>
-        <div class="trade-tags">
-          <span class="psych-tag good">Patient</span>
-          <span class="psych-tag good">A+ Confluence</span>
-          <span class="psych-tag good">Zero FOMO</span>
-        </div>
-        <div class="trade-footer">
-          <span class="discipline-badge green">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            Rules Followed
-          </span>
-          <span class="confluences">4/4 Confluences</span>
-        </div>
-        <div class="trade-screenshot-action">
-          <a href="https://www.tradingview.com/x/dma_sample/" target="_blank" rel="noopener noreferrer" class="btn-view-trade-chart" title="Open TradingView Screenshot" onclick="event.stopPropagation();">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-            <span>VIEW TRADINGVIEW SCREENSHOT</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-          </a>
-        </div>
-      </div>
-
-      <!-- Trade Card 2 (Rules Broken) -->
-      <div class="trade-card broken" 
-           data-trade-id="demo-2"
-           data-asset="NQ1!" 
-           data-direction="short" 
-           data-setup="impulse"
-           data-date="today"
-           data-time="14:15 PM"
-           data-pnl="-450"
-           data-rmult="-1.0R"
-           data-compliance="false"
-           data-confluences-met="1"
-           data-confluences-total="4"
-           data-confluences='["4H Key S/R Level swept (MISSED)","15M Market Structure Shift (MISSED)","Order Block / FVG retest (MISSED)","Impulse breakout entry (CHASED)"]'
-           data-breach="Impulse Entry (FOMO)"
-           data-notes="FOMO caught me during high volatility news. Broke rule #2 and entered prematurely without waiting for 15M candle close."
-           data-tags='["FOMO", "Rules Broken", "Premature"]'>
-        <div class="trade-header">
-          <div class="trade-asset">
-            <span class="direction short">SHORT</span>
-            <span class="ticker">NQ1!</span>
-          </div>
-          <div class="trade-pnl loss">-$450.00</div>
-        </div>
-        <div class="trade-meta">
-          <span class="time">14:15 PM</span>
-          <span class="setup-name">Impulse Entry (FOMO)</span>
-        </div>
-        <div class="trade-tags">
-          <span class="psych-tag bad">FOMO</span>
-          <span class="psych-tag bad">Rules Broken</span>
-          <span class="psych-tag bad">Premature</span>
-        </div>
-        <div class="trade-footer">
-          <span class="discipline-badge red">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            Rules Broken
-          </span>
-          <span class="confluences">1/4 Confluences</span>
-        </div>
-      </div>
-
-      <div class="date-group-header">
-        <span>Yesterday</span>
-        <span class="date-group-stat">Net: <b class="red">-$210.00</b> · 1 trade</span>
-      </div>
-
-      <!-- Trade Card 3 (Rules Followed, Loss) -->
-      <div class="trade-card followed" 
-           data-trade-id="demo-3"
-           data-asset="EURUSD" 
-           data-direction="long" 
-           data-setup="trend"
-           data-date="yesterday"
-           data-time="08:10 AM"
-           data-pnl="-210"
-           data-rmult="-1.0R"
-           data-compliance="true"
-           data-confluences-met="3"
-           data-confluences-total="3"
-           data-confluences='["H1 Trend continuation alignment","Pullback to 50% discount zone","Clean invalidation below swing low"]'
-           data-notes="Good setup, fully compliant execution. Took a standard statistical loss. No emotional reaction."
-           data-tags='["Good Loss", "Stat Discipline"]'>
-        <div class="trade-header">
-          <div class="trade-asset">
-            <span class="direction long">LONG</span>
-            <span class="ticker">EURUSD</span>
-          </div>
-          <div class="trade-pnl loss">-$210.00</div>
-        </div>
-        <div class="trade-meta">
-          <span class="time">08:10 AM</span>
-          <span class="setup-name">Trend Continuation</span>
-        </div>
-        <div class="trade-tags">
-          <span class="psych-tag good">Good Loss</span>
-          <span class="psych-tag good">Stat Discipline</span>
-        </div>
-        <div class="trade-footer">
-          <span class="discipline-badge green">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            Rules Followed
-          </span>
-          <span class="confluences">3/3 Confluences</span>
-        </div>
-      </div>
-
-    </div>
+    <div class="trade-list" id="journal-trade-list"></div>
   </main>
 
   <!-- Side Drawer Overlay -->

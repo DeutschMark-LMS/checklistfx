@@ -1,10 +1,20 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // Ensure legacy sample data preference is pruned for a completely clean slate
+  try {
+    localStorage.removeItem('dma_include_sample_data');
+  } catch (_) {}
+
   const routeButtons = document.querySelectorAll('[data-route]');
 
   routeButtons.forEach((button) => {
     button.addEventListener('click', (event) => {
       const target = button.getAttribute('data-route');
       if (!target) return;
+
+      // Allow native browser navigation for <a> links to prevent white/reload flash
+      if (button.tagName === 'A' && button.getAttribute('href') === target) {
+        return;
+      }
 
       event.preventDefault();
       window.location.href = target;
@@ -148,68 +158,38 @@ document.addEventListener('DOMContentLoaded', () => {
   // The login/signup pages remain available for the product flow when needed.
 
   // ==========================================================================
-  // DASHBOARD DYNAMIC LEDGER & SAMPLE DATA BANNER
+  // DASHBOARD DYNAMIC LEDGER METRICS
   // ==========================================================================
   function initDashboardModule() {
-    const banner = document.getElementById('dashboard-sample-banner');
     const netPnlEl = document.getElementById('dashboard-net-pnl');
     if (!netPnlEl) return;
 
-    const pill = document.getElementById('dashboard-sample-pill');
-    const pillText = document.getElementById('dashboard-sample-pill-text');
-    const hint = document.getElementById('dashboard-sample-hint');
-    const toggleBtn = document.getElementById('dashboard-toggle-sample-btn');
     const labelFollowed = document.getElementById('dashboard-followed-pnl');
     const labelBroken = document.getElementById('dashboard-broken-pnl');
     const barGood = document.getElementById('dashboard-bar-good');
     const barBad = document.getElementById('dashboard-bar-bad');
 
     function updateDashboardMetrics() {
-      const includeSample = localStorage.getItem('dma_include_sample_data') !== 'false';
-
-      if (banner) {
-        banner.classList.toggle('demo-active', includeSample);
-      }
-      if (pillText) {
-        pillText.textContent = includeSample ? 'Demo Mode: Sample Trades Visible' : 'Live Ledger: Real Trades Only';
-      }
-      if (hint) {
-        hint.textContent = includeSample 
-          ? 'Viewing preloaded benchmark data alongside your trades.' 
-          : 'Clean account ($0.00). Toggle sample data to explore benchmark trades.';
-      }
-      if (toggleBtn) {
-        const toggleText = toggleBtn.querySelector('span') || toggleBtn;
-        toggleText.textContent = includeSample ? 'Switch to Clean Ledger ($0.00)' : 'Enable Sample Data';
-      }
-
-      let baseNet = includeSample ? 4250 : 0;
-      let baseFollowed = includeSample ? 6100 : 0;
-      let baseBroken = includeSample ? -1850 : 0;
-
       let customTrades = [];
       try {
         customTrades = JSON.parse(localStorage.getItem('dma_trades') || '[]');
       } catch (_) {}
 
-      let customNet = 0;
-      let customFollowed = 0;
-      let customBroken = 0;
+      let totalNet = 0;
+      let totalFollowed = 0;
+      let totalBroken = 0;
 
       customTrades.forEach(t => {
         const pnl = Number(t.pnl) || 0;
-        customNet += pnl;
+        totalNet += pnl;
         if (t.isCompliant) {
-          customFollowed += (pnl > 0 ? pnl : 0);
+          totalFollowed += (pnl > 0 ? pnl : 0);
         } else {
-          customBroken += (pnl < 0 ? pnl : 0);
+          totalBroken += (pnl < 0 ? pnl : 0);
         }
       });
 
-      const totalNet = baseNet + customNet;
-      const totalFollowed = baseFollowed + customFollowed;
-      const totalBroken = baseBroken + customBroken;
-      const hasTrades = (includeSample && baseNet !== 0) || customTrades.length > 0;
+      const hasTrades = customTrades.length > 0;
 
       if (netPnlEl) {
         if (!hasTrades) {
@@ -258,12 +238,6 @@ document.addEventListener('DOMContentLoaded', () => {
           if (hudWrSub) hudWrSub.textContent = '0 Trades Logged';
           if (hudDiscipline) hudDiscipline.textContent = 'STRICT GATES';
           if (hudDisciplineSub) hudDisciplineSub.textContent = 'Zero FOMO';
-        } else if (includeSample && customTrades.length === 0) {
-          hudWr.textContent = '+76.2% WR';
-          hudWr.className = 'pillar-val gold';
-          if (hudWrSub) hudWrSub.textContent = 'Sample Benchmark';
-          if (hudDiscipline) hudDiscipline.textContent = 'STRICT GATES';
-          if (hudDisciplineSub) hudDisciplineSub.textContent = 'Rules = Profit';
         } else {
           let wins = 0;
           let compliantCount = 0;
@@ -289,18 +263,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.updateDashboardMetrics = updateDashboardMetrics;
-
-    if (toggleBtn) {
-      toggleBtn.addEventListener('click', () => {
-        const current = localStorage.getItem('dma_include_sample_data') !== 'false';
-        localStorage.setItem('dma_include_sample_data', (!current) ? 'true' : 'false');
-        updateDashboardMetrics();
-        if (typeof window.renderDashboardPlaybooks === 'function') {
-          window.renderDashboardPlaybooks();
-        }
-      });
-    }
-
     updateDashboardMetrics();
     window.addEventListener('dma-auth-changed', updateDashboardMetrics);
     window.addEventListener('storage', updateDashboardMetrics);
@@ -316,97 +278,136 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!journalList) return;
 
     // 1. Render custom trades from localStorage
+    function buildTradeCard(t, dateAttr) {
+      const card = document.createElement('div');
+      const isWin = Number(t.pnl) >= 0;
+      const pnlNum = Number(t.pnl) || 0;
+      const pnlFormatted = isWin 
+        ? `+$${pnlNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
+        : `-$${Math.abs(pnlNum).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const rMult = t.rMultiple || (isWin ? '+2.2R' : '-1.0R');
+      const strategyTitle = t.strategy || (t.strategyKey === 'trend' ? 'Trend Continuation' : (t.strategyKey === 'impulse' ? 'Impulse Entry' : 'A+ Reversal'));
+
+      card.className = `trade-card ${t.isCompliant ? 'followed' : 'broken'}`;
+      card.setAttribute('data-trade-id', t.id || Date.now());
+      card.setAttribute('data-asset', t.asset || 'XAUUSD');
+      card.setAttribute('data-direction', (t.direction || 'long').toLowerCase());
+      card.setAttribute('data-setup', t.strategyKey || 'reversal');
+      card.setAttribute('data-date', dateAttr);
+      card.setAttribute('data-time', t.date || 'Today');
+      card.setAttribute('data-timestamp', t.timestamp || Date.now());
+      card.setAttribute('data-pnl', pnlNum);
+      card.setAttribute('data-rmult', rMult);
+      card.setAttribute('data-compliance', t.isCompliant ? 'true' : 'false');
+      card.setAttribute('data-confluences-met', t.confluencesMet || (t.isCompliant ? 4 : 1));
+      card.setAttribute('data-confluences-total', t.totalConfluences || 4);
+      
+      const tags = t.isCompliant 
+        ? ['Rules Followed', 'Disciplined', 'Playbook'] 
+        : ['Rules Broken', t.breachReason || 'FOMO', 'Impulse'];
+      card.setAttribute('data-tags', JSON.stringify(tags));
+
+      const defaultConfluences = t.isCompliant 
+        ? ['4H Key S/R Level or Liquidity Pool swept', '15M Market Structure Shift (MSS) verified', 'Order Block or FVG retest established', 'Strict risk:reward parameters maintained']
+        : ['4H Key S/R Level or Liquidity Pool swept (MISSED)', '15M Market Structure Shift (MISSED)', 'Order Block or FVG retest (MISSED)', t.breachReason ? `Rule breach: ${t.breachReason}` : 'Chased price prematurely'];
+      card.setAttribute('data-confluences', JSON.stringify(t.confluences && t.confluences.length > 0 ? t.confluences : defaultConfluences));
+
+      if (t.screenshotUrl) {
+        card.setAttribute('data-screenshot', t.screenshotUrl);
+      }
+      card.setAttribute('data-notes', t.notes || (t.isCompliant ? 'Executed with 100% adherence to trading playbook.' : `Execution violated discipline rules: ${t.breachReason || 'FOMO chase'}`));
+
+      const tagBadgesHtml = tags.map(tag => `<span class="psych-tag ${t.isCompliant ? 'good' : 'bad'}">${tag}</span>`).join(' ');
+
+      const screenshotActionHtml = t.screenshotUrl ? `
+        <div class="trade-screenshot-action">
+          <a href="${t.screenshotUrl}" target="_blank" rel="noopener noreferrer" class="btn-view-trade-chart" title="Open TradingView Screenshot" onclick="event.stopPropagation();">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            <span>VIEW TRADINGVIEW SCREENSHOT</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+          </a>
+        </div>
+      ` : '';
+
+      card.innerHTML = `
+        <div class="trade-header">
+          <div class="trade-asset">
+            <span class="direction ${(t.direction || 'long').toLowerCase()}">${(t.direction || 'long').toUpperCase()}</span>
+            <span class="ticker">${t.asset || 'XAUUSD'}</span>
+          </div>
+          <div class="trade-pnl ${isWin ? 'win' : 'loss'}">${pnlFormatted}</div>
+        </div>
+        <div class="trade-meta">
+          <span class="time">${t.date || 'Today'}</span>
+          <span class="setup-name">${strategyTitle}</span>
+        </div>
+        <div class="trade-tags">
+          ${tagBadgesHtml}
+        </div>
+        <div class="trade-footer">
+          <span class="discipline-badge ${t.isCompliant ? 'green' : 'red'}">
+            ${t.isCompliant ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Rules Followed' : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Rules Broken'}
+          </span>
+          <span class="confluences">${t.confluencesMet || (t.isCompliant ? 4 : 1)}/${t.totalConfluences || 4} Confluences</span>
+        </div>
+        ${screenshotActionHtml}
+      `;
+      return card;
+    }
+
     try {
       const customTrades = JSON.parse(localStorage.getItem('dma_trades') || '[]');
       if (customTrades.length > 0) {
-        const todayHeader = journalList.querySelector('.date-group-header');
-        customTrades.forEach(t => {
-          const card = document.createElement('div');
-          const isWin = Number(t.pnl) >= 0;
-          const pnlNum = Number(t.pnl) || 0;
-          const pnlFormatted = isWin 
-            ? `+$${pnlNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
-            : `-$${Math.abs(pnlNum).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-          const rMult = t.rMultiple || (isWin ? '+2.2R' : '-1.0R');
-          const strategyTitle = t.strategy || (t.strategyKey === 'trend' ? 'Trend Continuation' : (t.strategyKey === 'impulse' ? 'Impulse Entry' : 'A+ Reversal'));
+        journalList.innerHTML = '';
+        const groups = {};
+        const groupOrder = [];
 
-          card.className = `trade-card ${t.isCompliant ? 'followed' : 'broken'}`;
-          card.setAttribute('data-trade-id', t.id || Date.now());
-          card.setAttribute('data-asset', t.asset || 'XAUUSD');
-          card.setAttribute('data-direction', (t.direction || 'long').toLowerCase());
-          card.setAttribute('data-setup', t.strategyKey || 'reversal');
-          card.setAttribute('data-date', 'today');
-          card.setAttribute('data-time', t.date || 'Today');
-          card.setAttribute('data-timestamp', t.timestamp || Date.now());
-          card.setAttribute('data-pnl', pnlNum);
-          card.setAttribute('data-rmult', rMult);
-          card.setAttribute('data-compliance', t.isCompliant ? 'true' : 'false');
-          card.setAttribute('data-confluences-met', t.confluencesMet || (t.isCompliant ? 4 : 1));
-          card.setAttribute('data-confluences-total', t.totalConfluences || 4);
-          
-          const tags = t.isCompliant 
-            ? ['Rules Followed', 'Disciplined', 'Playbook'] 
-            : ['Rules Broken', t.breachReason || 'FOMO', 'Impulse'];
-          card.setAttribute('data-tags', JSON.stringify(tags));
+        const sortedTrades = [...customTrades].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        const now = new Date();
+        const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const yDate = new Date(now.getTime() - 86400000);
+        const yestKey = `${yDate.getFullYear()}-${String(yDate.getMonth() + 1).padStart(2, '0')}-${String(yDate.getDate()).padStart(2, '0')}`;
 
-          const defaultConfluences = t.isCompliant 
-            ? ['4H Key S/R Level or Liquidity Pool swept', '15M Market Structure Shift (MSS) verified', 'Order Block or FVG retest established', 'Strict risk:reward parameters maintained']
-            : ['4H Key S/R Level or Liquidity Pool swept (MISSED)', '15M Market Structure Shift (MISSED)', 'Order Block or FVG retest (MISSED)', t.breachReason ? `Rule breach: ${t.breachReason}` : 'Chased price prematurely'];
-          card.setAttribute('data-confluences', JSON.stringify(t.confluences && t.confluences.length > 0 ? t.confluences : defaultConfluences));
-
-          if (t.screenshotUrl) {
-            card.setAttribute('data-screenshot', t.screenshotUrl);
+        sortedTrades.forEach(t => {
+          let dKey = todayKey;
+          if (t.timestamp) {
+            const d = new Date(t.timestamp);
+            dKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
           }
-          card.setAttribute('data-notes', t.notes || (t.isCompliant ? 'Executed with 100% adherence to trading playbook.' : `Execution violated discipline rules: ${t.breachReason || 'FOMO chase'}`));
-
-          const tagBadgesHtml = tags.map(tag => `<span class="psych-tag ${t.isCompliant ? 'good' : 'bad'}">${tag}</span>`).join(' ');
-
-          const screenshotActionHtml = t.screenshotUrl ? `
-            <div class="trade-screenshot-action">
-              <a href="${t.screenshotUrl}" target="_blank" rel="noopener noreferrer" class="btn-view-trade-chart" title="Open TradingView Screenshot" onclick="event.stopPropagation();">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-                <span>VIEW TRADINGVIEW SCREENSHOT</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-              </a>
-            </div>
-          ` : '';
-
-          card.innerHTML = `
-            <div class="trade-header">
-              <div class="trade-asset">
-                <span class="direction ${(t.direction || 'long').toLowerCase()}">${(t.direction || 'long').toUpperCase()}</span>
-                <span class="ticker">${t.asset || 'XAUUSD'}</span>
-              </div>
-              <div class="trade-pnl ${isWin ? 'win' : 'loss'}">${pnlFormatted}</div>
-            </div>
-            <div class="trade-meta">
-              <span class="time">${t.date || 'Today'}</span>
-              <span class="setup-name">${strategyTitle}</span>
-            </div>
-            <div class="trade-tags">
-              ${tagBadgesHtml}
-            </div>
-            <div class="trade-footer">
-              <span class="discipline-badge ${t.isCompliant ? 'green' : 'red'}">
-                ${t.isCompliant ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Rules Followed' : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Rules Broken'}
-              </span>
-              <span class="confluences">${t.confluencesMet || (t.isCompliant ? 4 : 1)}/${t.totalConfluences || 4} Confluences</span>
-            </div>
-            ${screenshotActionHtml}
-          `;
-
-          if (todayHeader && todayHeader.nextSibling) {
-            todayHeader.parentNode.insertBefore(card, todayHeader.nextSibling);
-          } else {
-            journalList.prepend(card);
+          if (!groups[dKey]) {
+            groups[dKey] = [];
+            groupOrder.push(dKey);
           }
+          groups[dKey].push(t);
+        });
+
+        groupOrder.forEach(dKey => {
+          let label = dKey;
+          if (dKey === todayKey) label = 'Today';
+          else if (dKey === yestKey) label = 'Yesterday';
+          else {
+            const parts = dKey.split('-');
+            const dObj = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+            label = dObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+          }
+
+          const header = document.createElement('div');
+          header.className = 'date-group-header';
+          header.innerHTML = `<span>${label}</span><span class="date-group-stat"></span>`;
+          journalList.appendChild(header);
+
+          groups[dKey].forEach(t => {
+            const dateAttr = dKey === todayKey ? 'today' : (dKey === yestKey ? 'yesterday' : 'past');
+            const card = buildTradeCard(t, dateAttr);
+            journalList.appendChild(card);
+          });
         });
       }
     } catch (err) {
       console.warn('Could not load custom trades into journal', err);
     }
 
-    // Attach saved debrief badges to all trade cards (demo + custom)
+    // Attach saved debrief badges to all trade cards
     try {
       const storedDebriefs = JSON.parse(localStorage.getItem('dma_trade_debriefs') || '{}');
       journalList.querySelectorAll('.trade-card').forEach(card => {
@@ -449,35 +450,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let activeTab = 'all'; // 'all' | 'followed' | 'broken'
     let activeDateFilter = 'all'; // 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom'
     let activeCalFilteredDate = null; // YYYY-MM-DD when clicked in calendar
-
-    // Sample Data Toggle Controls
-    const toggleSampleBtn = document.getElementById('toggle-sample-data-btn');
-    const sampleStatusPill = document.getElementById('sample-status-pill');
-    const sampleStatusText = document.getElementById('sample-status-text');
-
-    function syncSampleDataUI() {
-      const includeSample = localStorage.getItem('dma_include_sample_data') !== 'false';
-      if (sampleStatusPill) {
-        sampleStatusPill.classList.toggle('hidden-mode', !includeSample);
-      }
-      if (sampleStatusText) {
-        sampleStatusText.textContent = includeSample ? 'Sample Trades: Active' : 'Sample Trades: Hidden';
-      }
-      if (toggleSampleBtn) {
-        toggleSampleBtn.textContent = includeSample ? 'Hide Sample Data' : 'Show Sample Data';
-      }
-    }
-
-    if (toggleSampleBtn) {
-      syncSampleDataUI();
-      toggleSampleBtn.addEventListener('click', () => {
-        const current = localStorage.getItem('dma_include_sample_data') !== 'false';
-        localStorage.setItem('dma_include_sample_data', (!current) ? 'true' : 'false');
-        syncSampleDataUI();
-        applyAllJournalFilters();
-        renderCalendarHeatmap();
-      });
-    }
     let searchQuery = '';
     let advFilters = {
       asset: 'all',
@@ -580,14 +552,13 @@ document.addEventListener('DOMContentLoaded', () => {
           matchCalDate = getTradeDateKey(card) === activeCalFilteredDate;
         }
 
-        const includeSample = localStorage.getItem('dma_include_sample_data') !== 'false';
         const tradeId = card.getAttribute('data-trade-id') || '';
-        let matchSample = true;
-        if (!includeSample && tradeId.startsWith('demo-')) {
-          matchSample = false;
+        if (tradeId.startsWith('demo-')) {
+          card.style.display = 'none';
+          return;
         }
 
-        const isVisible = matchTab && matchSearch && matchDateFilter && matchAdv && matchCalDate && matchSample;
+        const isVisible = matchTab && matchSearch && matchDateFilter && matchAdv && matchCalDate;
 
         if (isVisible) {
           card.style.display = 'flex';
@@ -688,23 +659,25 @@ document.addEventListener('DOMContentLoaded', () => {
           emptyState = document.createElement('div');
           emptyState.id = 'journal-empty-state';
           emptyState.className = 'journal-empty-state';
-          const isSampleHidden = localStorage.getItem('dma_include_sample_data') === 'false';
           emptyState.innerHTML = `
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--ink-muted); margin-bottom: 0.75rem;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <h4>${isSampleHidden ? 'No Live Trades Logged' : 'No Trades Found'}</h4>
-            <p>${isSampleHidden ? 'Sample demo trades are currently hidden. Log your trades in the Trade Terminal, or enable sample data to view benchmark models.' : 'No logged trades match the selected date, tab, or search criteria.'}</p>
+            <h4>No Trades Found</h4>
+            <p>No logged trades match the selected criteria, or you haven't logged any trades yet.</p>
             <div style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 0.5rem; flex-wrap: wrap;">
-              ${isSampleHidden ? '<button type="button" class="btn btn-primary" id="empty-show-sample-btn" style="padding: 0.45rem 0.9rem; font-size: 0.78rem;">Show Sample Data</button>' : ''}
-              <button type="button" class="btn btn-ghost" id="empty-reset-filters-btn" style="padding: 0.45rem 0.9rem; font-size: 0.78rem;">Reset All Filters</button>
+              <button type="button" class="btn btn-primary" id="empty-log-trade-btn" style="padding: 0.45rem 0.9rem; font-size: 0.78rem;">Log Trade</button>
+              <button type="button" class="btn btn-ghost" id="empty-reset-filters-btn" style="padding: 0.45rem 0.9rem; font-size: 0.78rem;">Reset Filters</button>
             </div>
           `;
           journalList.appendChild(emptyState);
           document.getElementById('empty-reset-filters-btn')?.addEventListener('click', resetAllFilters);
-          document.getElementById('empty-show-sample-btn')?.addEventListener('click', () => {
-            localStorage.setItem('dma_include_sample_data', 'true');
-            if (typeof syncSampleDataUI === 'function') syncSampleDataUI();
-            applyAllJournalFilters();
-            renderCalendarHeatmap();
+          document.getElementById('empty-log-trade-btn')?.addEventListener('click', () => {
+            const modal = document.getElementById('trade-logger-modal');
+            const backdrop = document.getElementById('trade-logger-backdrop');
+            if (modal && backdrop) {
+              modal.style.display = 'block';
+              backdrop.style.display = 'block';
+              document.body.classList.add('modal-open');
+            }
           });
         }
       } else {
@@ -1163,10 +1136,9 @@ document.addEventListener('DOMContentLoaded', () => {
       let monthCompliantCount = 0;
       let monthTradeCount = 0;
 
-      const includeSample = localStorage.getItem('dma_include_sample_data') !== 'false';
       allCards.forEach(card => {
         const tid = card.getAttribute('data-trade-id') || '';
-        if (!includeSample && tid.startsWith('demo-')) return;
+        if (tid.startsWith('demo-')) return;
 
         const dateKey = getTradeDateKey(card);
         const pnl = parseFloat(card.getAttribute('data-pnl')) || 0;
@@ -1190,14 +1162,22 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       if (monthNetEl) {
-        const fNet = monthTotalNet >= 0 
-          ? `+$${monthTotalNet.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
-          : `-$${Math.abs(monthTotalNet).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        monthNetEl.innerHTML = `Month Net: <b style="color: ${monthTotalNet >= 0 ? 'var(--success)' : 'var(--danger)'};">${fNet}</b>`;
+        if (monthTradeCount === 0) {
+          monthNetEl.innerHTML = `Month Net: <b style="color: var(--ink-muted);">$0.00</b>`;
+        } else {
+          const fNet = monthTotalNet >= 0 
+            ? `+$${monthTotalNet.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
+            : `-$${Math.abs(monthTotalNet).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          monthNetEl.innerHTML = `Month Net: <b style="color: ${monthTotalNet >= 0 ? 'var(--success)' : 'var(--danger)'};">${fNet}</b>`;
+        }
       }
       if (monthDiscEl) {
-        const discRate = monthTradeCount > 0 ? Math.round((monthCompliantCount / monthTradeCount) * 100) : 100;
-        monthDiscEl.innerHTML = `Discipline: <b style="color: ${discRate >= 80 ? 'var(--success)' : (discRate >= 50 ? 'var(--cyan)' : 'var(--danger)')};">${discRate}%</b>`;
+        if (monthTradeCount === 0) {
+          monthDiscEl.innerHTML = `Discipline: <b style="color: var(--ink-muted);">--%</b>`;
+        } else {
+          const discRate = Math.round((monthCompliantCount / monthTradeCount) * 100);
+          monthDiscEl.innerHTML = `Discipline: <b style="color: ${discRate >= 80 ? 'var(--success)' : (discRate >= 50 ? 'var(--cyan)' : 'var(--danger)')};">${discRate}%</b>`;
+        }
       }
 
       // First day of month (Monday=0: (day + 6) % 7)
@@ -1594,20 +1574,17 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     };
 
-    const includeSample = localStorage.getItem('dma_include_sample_data') !== 'false';
     const rawB = basePeriods[period] || basePeriods.this_month;
     const b = JSON.parse(JSON.stringify(rawB));
 
-    if (!includeSample) {
-      b.baseTotal = 0;
-      b.baseCompliant = 0;
-      b.baseActual = 0;
-      b.baseFollowed = 0;
-      b.m1.count = 0; b.m1.cost = 0;
-      b.m2.count = 0; b.m2.cost = 0;
-      b.m3.count = 0; b.m3.cost = 0;
-      b.weeks.forEach(w => { w.actual = 0; w.ideal = 0; });
-    }
+    b.baseTotal = 0;
+    b.baseCompliant = 0;
+    b.baseActual = 0;
+    b.baseFollowed = 0;
+    b.m1.count = 0; b.m1.cost = 0;
+    b.m2.count = 0; b.m2.cost = 0;
+    b.m3.count = 0; b.m3.cost = 0;
+    b.weeks.forEach(w => { w.actual = 0; w.ideal = 0; });
 
     // Load custom logged trades
     let customTrades = [];
@@ -1746,23 +1723,23 @@ document.addEventListener('DOMContentLoaded', () => {
       polyIdeal: idealPoints,
       m1: {
         count: `${b.m1.count} Occurrences`,
-        leak: `-$${Math.round(Math.abs(b.m1.cost) / (b.m1.count || 1))} / breach`,
-        cost: fmt(b.m1.cost)
+        leak: b.m1.count > 0 ? `-$${Math.round(Math.abs(b.m1.cost) / (b.m1.count || 1))} / breach` : '$0.00 / breach',
+        cost: b.m1.count > 0 ? fmt(b.m1.cost) : '$0.00'
       },
       m2: {
         count: `${b.m2.count} Occurrences`,
-        leak: `-$${Math.round(Math.abs(b.m2.cost) / (b.m2.count || 1))} / breach`,
-        cost: fmt(b.m2.cost)
+        leak: b.m2.count > 0 ? `-$${Math.round(Math.abs(b.m2.cost) / (b.m2.count || 1))} / breach` : '$0.00 / breach',
+        cost: b.m2.count > 0 ? fmt(b.m2.cost) : '$0.00'
       },
       m3: {
         count: `${b.m3.count} Occurrences`,
-        leak: `-$${Math.round(Math.abs(b.m3.cost) / (b.m3.count || 1))} / breach`,
-        cost: fmt(b.m3.cost)
+        leak: b.m3.count > 0 ? `-$${Math.round(Math.abs(b.m3.cost) / (b.m3.count || 1))} / breach` : '$0.00 / breach',
+        cost: b.m3.count > 0 ? fmt(b.m3.cost) : '$0.00'
       },
       edges: b.edges.map(e => ({
         name: e.name,
-        bar: !includeSample && totalTrades === 0 ? '0%' : `${e.val}%`,
-        val: !includeSample && totalTrades === 0 ? '0%' : `${e.val}%`
+        bar: totalTrades === 0 ? '0%' : `${e.val}%`,
+        val: totalTrades === 0 ? '--%' : `${e.val}%`
       }))
     };
   }
@@ -1832,6 +1809,52 @@ document.addEventListener('DOMContentLoaded', () => {
     if (m3Count) m3Count.textContent = data.m3.count;
     if (m3Leak) m3Leak.textContent = data.m3.leak;
     if (m3Cost) m3Cost.textContent = data.m3.cost;
+
+    // Render breach trades in mistake drawers if present
+    try {
+      const customTrades = JSON.parse(localStorage.getItem('dma_trades') || '[]');
+      ['m1', 'm2', 'm3'].forEach((mKey, idx) => {
+        const drawer = document.getElementById(`${mKey}-drawer`);
+        if (drawer) {
+          const inner = drawer.querySelector('.drawer-inner');
+          if (inner) {
+            const actionBtn = inner.querySelector('.drawer-action-btn');
+            const matchingBreaches = customTrades.filter(t => {
+              if (t.isCompliant) return false;
+              const breach = (t.breachReason || '').toLowerCase();
+              if (idx === 0) return breach.includes('stop');
+              if (idx === 1) return breach.includes('fomo') || breach.includes('impulse') || breach.includes('chase');
+              return !breach.includes('stop') && !breach.includes('fomo') && !breach.includes('impulse') && !breach.includes('chase');
+            });
+
+            const existingRows = inner.querySelectorAll('.sample-trade-row, .empty-drawer-note');
+            existingRows.forEach(r => r.remove());
+
+            if (matchingBreaches.length === 0) {
+              const note = document.createElement('div');
+              note.className = 'empty-drawer-note';
+              note.style.cssText = 'color: var(--ink-muted); font-size: 0.78rem; padding: 0.5rem 0;';
+              note.textContent = 'No breach trades recorded';
+              if (actionBtn) inner.insertBefore(note, actionBtn);
+              else inner.appendChild(note);
+            } else {
+              matchingBreaches.slice(0, 5).forEach(bTrade => {
+                const row = document.createElement('div');
+                row.className = 'sample-trade-row';
+                const pnlVal = Number(bTrade.pnl) || 0;
+                row.innerHTML = `
+                  <span class="st-date">${bTrade.date || 'Recent'}</span>
+                  <span class="st-asset">${bTrade.asset || 'Trade'} ${bTrade.direction || ''}</span>
+                  <span class="st-loss">-$${Math.abs(pnlVal).toLocaleString('en-US')}</span>
+                `;
+                if (actionBtn) inner.insertBefore(row, actionBtn);
+                else inner.appendChild(row);
+              });
+            }
+          }
+        }
+      });
+    } catch (_) {}
 
     // 5. Edges
     data.edges.forEach((edge, idx) => {
@@ -1941,13 +1964,12 @@ document.addEventListener('DOMContentLoaded', () => {
         debriefs = JSON.parse(localStorage.getItem('dma_trade_debriefs') || '{}');
       } catch (_) {}
 
-      const seedTrades = [
-        { id: 'demo-1', date: 'Today · 09:32 AM', asset: 'XAUUSD', direction: 'LONG', setup: 'A+ Setup Reversal', pnl: 1240, rMultiple: '+2.5R', isCompliant: true, confluencesMet: 4, totalConfluences: 4, breachReason: '', notes: 'Disciplined execution at London open.' },
-        { id: 'demo-2', date: 'Today · 14:15 PM', asset: 'NQ1!', direction: 'SHORT', setup: 'Impulse Entry (FOMO)', pnl: -450, rMultiple: '-1.0R', isCompliant: false, confluencesMet: 1, totalConfluences: 4, breachReason: 'Impulse Entry (FOMO)', notes: 'FOMO caught me during news volatility.' },
-        { id: 'demo-3', date: 'Yesterday · 08:10 AM', asset: 'EURUSD', direction: 'LONG', setup: 'Trend Continuation', pnl: -210, rMultiple: '-1.0R', isCompliant: true, confluencesMet: 3, totalConfluences: 3, breachReason: '', notes: 'Good setup, fully compliant execution.' }
-      ];
+      const all = customTrades;
+      if (all.length === 0) {
+        alert('No live trades logged yet. Log a trade in the Trade Terminal to export your journal report.');
+        return;
+      }
 
-      const all = [...customTrades, ...seedTrades];
       const headers = ['Trade ID', 'Date/Time', 'Asset', 'Direction', 'Setup Strategy', 'PnL ($)', 'R-Multiple', 'Adherence Status', 'Confluences Met', 'Breach Reason', 'Execution Grade', 'Psychology / Emotion', 'Exit Quality', 'Retrospective Lessons'];
       const rows = [headers.join(',')];
 
@@ -1984,42 +2006,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function syncAnalyticsBanner() {
-    const banner = document.getElementById('dashboard-sample-banner');
-    if (!banner) return;
-    const includeSample = localStorage.getItem('dma_include_sample_data') !== 'false';
-    const pillText = document.getElementById('dashboard-sample-pill-text');
-    const hint = document.getElementById('dashboard-sample-hint');
-    const toggleBtn = document.getElementById('dashboard-toggle-sample-btn');
-
-    banner.classList.toggle('demo-active', includeSample);
-    if (pillText) {
-      pillText.textContent = includeSample ? 'Demo Mode: Sample Trades Visible' : 'Live Ledger: Real Trades Only';
-    }
-    if (hint) {
-      hint.textContent = includeSample 
-        ? 'Viewing preloaded benchmark data alongside your trades.' 
-        : 'Clean account ($0.00). Toggle sample data to explore benchmark analytics.';
-    }
-    if (toggleBtn) {
-      const toggleText = toggleBtn.querySelector('span') || toggleBtn;
-      toggleText.textContent = includeSample ? 'Switch to Clean ($0.00)' : 'Enable Sample Data';
-    }
-  }
-
-  const anToggleBtn = document.getElementById('dashboard-toggle-sample-btn');
-  if (anToggleBtn && document.getElementById('discipline-score-num')) {
-    anToggleBtn.addEventListener('click', () => {
-      const current = localStorage.getItem('dma_include_sample_data') !== 'false';
-      localStorage.setItem('dma_include_sample_data', (!current) ? 'true' : 'false');
-      syncAnalyticsBanner();
-      renderAnalytics(currentPeriod);
-    });
-  }
-
   // Initial call on analytics page if present
   if (document.getElementById('discipline-score-num')) {
-    syncAnalyticsBanner();
     renderAnalytics(currentPeriod);
   }
 
@@ -2621,30 +2609,15 @@ const benchmarkPlaybooks = {
 const playbookRegistry = {};
 
 /**
- * Returns effective playbooks respecting the sample data setting
+ * Returns effective playbooks (custom user playbooks only)
  */
 function getEffectivePlaybooks() {
-  const includeSample = localStorage.getItem('dma_include_sample_data') !== 'false';
   const deletedIds = JSON.parse(localStorage.getItem('dma_deleted_playbooks') || '[]');
   const customSaved = JSON.parse(localStorage.getItem('dma_custom_playbooks') || '[]');
 
   const list = [];
 
-  // 1. Include sample benchmark playbooks ONLY when enabled
-  if (includeSample) {
-    Object.values(benchmarkPlaybooks).forEach(bm => {
-      if (!deletedIds.includes(bm.id)) {
-        list.push(bm);
-        playbookRegistry[bm.id] = bm;
-        tradeStrategies[bm.id] = {
-          name: bm.name,
-          confluences: bm.confluences
-        };
-      }
-    });
-  }
-
-  // 2. Include user custom playbooks
+  // Include user custom playbooks
   customSaved.forEach(cp => {
     if (!deletedIds.includes(cp.id) && !list.some(item => item.id === cp.id)) {
       list.push(cp);
@@ -2659,14 +2632,28 @@ function getEffectivePlaybooks() {
   return list;
 }
 
+let lastRenderedPlaybooksHash = null;
+
 /**
- * Renders playbooks on app.html dashboard
+ * Renders playbooks on app.html dashboard with cache guard to eliminate re-render twitch
  */
-function renderDashboardPlaybooks() {
+function renderDashboardPlaybooks(force = false) {
   const container = document.getElementById('playbook-cards-list');
   if (!container) return;
 
   const playbooks = getEffectivePlaybooks();
+  const currentHash = JSON.stringify(playbooks.map(p => ({
+    id: p.id,
+    name: p.name,
+    wr: p.wr,
+    confluencesCount: p.confluences ? p.confluences.length : 0
+  })));
+
+  if (!force && container.children.length > 0 && lastRenderedPlaybooksHash === currentHash) {
+    return; // Data has not changed, do NOT wipe DOM and cause layout twitch
+  }
+  lastRenderedPlaybooksHash = currentHash;
+
   container.innerHTML = '';
 
   if (playbooks.length === 0) {
@@ -2675,25 +2662,15 @@ function renderDashboardPlaybooks() {
     emptyBox.innerHTML = `
       <div class="empty-pb-icon">📋</div>
       <h4 class="empty-pb-title">No Active Playbooks</h4>
-      <p class="empty-pb-desc">New account initialized. Build your custom setup with mandatory rules, or turn on sample data to explore prebuilt models.</p>
+      <p class="empty-pb-desc">New account initialized. Build your custom setup with mandatory rules to begin trading systematically.</p>
       <div class="empty-pb-actions">
         <button type="button" class="btn btn-primary btn-sm" id="empty-create-pb-btn">+ Create Setup</button>
-        <button type="button" class="btn btn-ghost btn-sm" id="empty-load-sample-pb-btn">Enable Sample Data</button>
       </div>
     `;
     container.appendChild(emptyBox);
 
     const createBtn = emptyBox.querySelector('#empty-create-pb-btn');
     if (createBtn) createBtn.addEventListener('click', openChecklistCreatorModal);
-
-    const sampleBtn = emptyBox.querySelector('#empty-load-sample-pb-btn');
-    if (sampleBtn) {
-      sampleBtn.addEventListener('click', () => {
-        localStorage.setItem('dma_include_sample_data', 'true');
-        if (typeof window.updateDashboardMetrics === 'function') window.updateDashboardMetrics();
-        renderDashboardPlaybooks();
-      });
-    }
     return;
   }
 
@@ -3178,47 +3155,21 @@ function initPlaybookWorkstation() {
 
   let activeFilter = 'all';
   let searchQuery = '';
+  let lastRenderedGridHash = null;
 
   function getActivePlaybooks() {
     return getEffectivePlaybooks();
   }
 
-  function syncPlaybookBanner() {
-    const banner = document.getElementById('dashboard-sample-banner');
-    if (!banner) return;
-    const includeSample = localStorage.getItem('dma_include_sample_data') !== 'false';
-    const pillText = document.getElementById('dashboard-sample-pill-text');
-    const hint = document.getElementById('dashboard-sample-hint');
-    const toggleBtn = document.getElementById('dashboard-toggle-sample-btn');
-
-    banner.classList.toggle('demo-active', includeSample);
-    if (pillText) {
-      pillText.textContent = includeSample ? 'Demo Mode: Sample Models Visible' : 'Live Ledger: Real Setups Only';
-    }
-    if (hint) {
-      hint.textContent = includeSample 
-        ? 'Viewing prebuilt benchmark models alongside your custom playbooks.' 
-        : 'Clean account. Toggle sample data to explore benchmark trading models.';
-    }
-    if (toggleBtn) {
-      const toggleText = toggleBtn.querySelector('span') || toggleBtn;
-      toggleText.textContent = includeSample ? 'Switch to Clean Ledger ($0.00)' : 'Enable Sample Data';
-    }
-  }
-
-  const pbToggleBtn = document.getElementById('dashboard-toggle-sample-btn');
-  if (pbToggleBtn) {
-    pbToggleBtn.addEventListener('click', () => {
-      const current = localStorage.getItem('dma_include_sample_data') !== 'false';
-      localStorage.setItem('dma_include_sample_data', (!current) ? 'true' : 'false');
-      syncPlaybookBanner();
-      renderGrid();
-    });
-  }
-
-  function renderGrid() {
+  function renderGrid(force = false) {
     const playbooks = getActivePlaybooks();
     const q = searchQuery.toLowerCase().trim();
+    const currentHash = `${activeFilter}|${q}|${JSON.stringify(playbooks.map(p => ({ id: p.id, name: p.name, wr: p.wr, pnl: p.pnl, type: p.setupType })))}`;
+
+    if (!force && grid.children.length > 0 && lastRenderedGridHash === currentHash) {
+      return; // Skip destructive wipe if state is identical
+    }
+    lastRenderedGridHash = currentHash;
 
     grid.innerHTML = '';
     let visibleCount = 0;
@@ -3234,24 +3185,15 @@ function initPlaybookWorkstation() {
       emptyBox.innerHTML = `
         <div class="empty-pb-icon">📖</div>
         <h4 class="empty-pb-title">No Playbook Models</h4>
-        <p class="empty-pb-desc">You haven't defined any systematic trading playbooks yet. Add your proprietary strategy or enable sample benchmark data.</p>
+        <p class="empty-pb-desc">You haven't defined any systematic trading playbooks yet. Add your proprietary strategy to start trading with discipline.</p>
         <div class="empty-pb-actions">
           <button type="button" class="btn btn-primary btn-sm" id="pb-empty-create-btn">+ Build New Playbook</button>
-          <button type="button" class="btn btn-ghost btn-sm" id="pb-empty-sample-btn">Load Demo Benchmark Setups</button>
         </div>
       `;
       grid.appendChild(emptyBox);
 
       const createBtn = emptyBox.querySelector('#pb-empty-create-btn');
       if (createBtn) createBtn.addEventListener('click', openChecklistCreatorModal);
-      const sampleBtn = emptyBox.querySelector('#pb-empty-sample-btn');
-      if (sampleBtn) {
-        sampleBtn.addEventListener('click', () => {
-          localStorage.setItem('dma_include_sample_data', 'true');
-          syncPlaybookBanner();
-          renderGrid();
-        });
-      }
 
       // Update KPI bar to clean empty values
       const kpiCount = document.getElementById('pb-kpi-count');
@@ -3264,7 +3206,7 @@ function initPlaybookWorkstation() {
       if (kpiEdge) kpiEdge.textContent = '-- Edge';
       if (kpiPnl) {
         kpiPnl.textContent = '$0.00';
-        kpiPnl.className = 'digest-val green';
+        kpiPnl.className = 'digest-val neutral';
       }
       return;
     }
@@ -3480,7 +3422,6 @@ function initPlaybookWorkstation() {
   }
 
   // Initial render
-  syncPlaybookBanner();
   renderGrid();
 
   window.refreshPlaybookGrid = renderGrid;
@@ -3489,8 +3430,11 @@ function initPlaybookWorkstation() {
 // Global Cloud Firestore Sync Listener
 window.addEventListener('dma-data-synced', () => {
   console.log('[DMA Backend] Cloud Firestore sync event received');
-  if (typeof window.updateDashboardMetrics === 'function') window.updateDashboardMetrics();
-  if (typeof window.renderDashboardPlaybooks === 'function') window.renderDashboardPlaybooks();
+  if (typeof window.updateDashboardMetrics === 'function') {
+    window.updateDashboardMetrics();
+  } else if (typeof window.renderDashboardPlaybooks === 'function') {
+    window.renderDashboardPlaybooks();
+  }
   if (typeof window.refreshPlaybookGrid === 'function') window.refreshPlaybookGrid();
   const syncBadge = document.getElementById('cloud-sync-text');
   if (syncBadge) syncBadge.textContent = 'Cloud Synced';

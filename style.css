@@ -17,8 +17,8 @@
   --success: #10b981;
   --danger: #f43f5e;
   
-  --font-sans: 'Inter', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -27,7 +27,10 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+}
 
 body {
   background-color: var(--bg);
@@ -687,7 +690,7 @@ input, textarea, select { font-family: inherit; color: var(--ink); background-co
   border-radius: var(--radius-sm);
   font-size: 1rem;
   font-family: var(--font-sans);
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
   outline: none;
 }
 
@@ -1275,7 +1278,7 @@ body.nav-open .side-drawer {
   font-weight: 600;
   font-size: 1.05rem;
   border-radius: var(--radius-sm);
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
 }
 
 .drawer-link svg {
@@ -1327,7 +1330,7 @@ body.nav-open .side-drawer {
   font-size: 0.85rem;
   font-weight: 600;
   white-space: nowrap;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
   cursor: pointer;
 }
 
@@ -1537,7 +1540,7 @@ body.filter-open .filter-sheet {
   border-radius: 100px; /* Fully rounded for sleekness */
   font-size: 0.85rem;
   font-weight: 600;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
   cursor: pointer;
 }
 
@@ -1977,7 +1980,7 @@ body.filter-open .filter-sheet {
   cursor: pointer;
   padding: 0.2rem 0.4rem;
   border-radius: 4px;
-  transition: all 0.15s;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.15s, opacity 0.15s;
 }
 
 .chart-labels .label-item.active {
@@ -2093,7 +2096,7 @@ body.filter-open .filter-sheet {
   padding: 0.5rem 0.85rem;
   border-radius: var(--radius-sm);
   text-decoration: none;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
   width: 100%;
   margin-top: 0.25rem;
 }
@@ -2235,7 +2238,7 @@ body.filter-open .filter-sheet {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  transition: all 0.25s;
+  transition: background-color 0.25s, border-color 0.25s, color 0.25s, box-shadow 0.25s, transform 0.25s, opacity 0.25s;
 }
 
 .live-compliance-badge.pending {
@@ -2295,7 +2298,7 @@ body.filter-open .filter-sheet {
   background: rgba(255, 255, 255, 0.03);
   color: var(--ink-muted);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
 }
 
 .dir-btn.long.active {
@@ -2329,7 +2332,7 @@ body.filter-open .filter-sheet {
   border-radius: var(--radius-sm);
   color: var(--ink-secondary);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
   text-align: left;
 }
 
@@ -2403,7 +2406,7 @@ body.filter-open .filter-sheet {
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
 }
 
@@ -2426,7 +2429,7 @@ body.filter-open .filter-sheet {
   align-items: center;
   justify-content: center;
   color: transparent;
-  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.18s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.18s cubic-bezier(0.16, 1, 0.3, 1), color 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1), transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   flex-shrink: 0;
   background: rgba(0, 0, 0, 0.3);
 }
@@ -2468,7 +2471,7 @@ body.filter-open .filter-sheet {
   font-weight: 800;
   letter-spacing: 0.06em;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .btn-verify-confluences:hover {
@@ -2504,7 +2507,7 @@ body.filter-open .filter-sheet {
   padding: 0.95rem 1.1rem;
   border-radius: 10px;
   margin-top: 0.5rem;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1), color 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -2596,7 +2599,7 @@ body.filter-open .filter-sheet {
   border-radius: 6px;
   outline: none;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
 }
 
 .breach-select:focus {
@@ -2621,7 +2624,7 @@ body.filter-open .filter-sheet {
   background: rgba(255, 255, 255, 0.03);
   color: var(--ink-muted);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
 }
 
 .outcome-pill.win.active {
@@ -2870,7 +2873,7 @@ body.filter-open .filter-sheet {
   cursor: pointer;
   font-size: 0.8rem;
   font-weight: 700;
-  transition: all 0.15s;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.15s, opacity 0.15s;
   flex-shrink: 0;
 }
 
@@ -2901,7 +2904,7 @@ body.filter-open .filter-sheet {
   padding: 0.3rem 0.6rem;
   border-radius: 100px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.15s, opacity 0.15s;
 }
 
 .s-chip:hover {
@@ -2947,7 +2950,7 @@ body.filter-open .filter-sheet {
   border: 1px solid var(--line);
   padding: 0.45rem 0.75rem;
   border-radius: var(--radius-sm);
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
 }
 
 .manual-pair-input-wrap:focus-within {
@@ -3049,7 +3052,7 @@ body.filter-open .filter-sheet {
   font-size: 0.74rem;
   font-weight: 700;
   letter-spacing: 0.02em;
-  transition: all 0.25s;
+  transition: background-color 0.25s, border-color 0.25s, color 0.25s, box-shadow 0.25s, transform 0.25s, opacity 0.25s;
 }
 
 .compliance-callout-compact.violation {
@@ -3116,7 +3119,7 @@ body.filter-open .filter-sheet {
   background: transparent;
   color: var(--ink-muted);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.15s, opacity 0.15s;
 }
 
 .sign-btn.active.pos,
@@ -3196,7 +3199,7 @@ body.filter-open .filter-sheet {
   border-radius: var(--radius-sm);
   outline: none;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
 }
 
 .strategy-dropdown-select:focus {
@@ -3242,7 +3245,7 @@ body.filter-open .filter-sheet {
   padding: 0.75rem;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
   text-align: center;
   width: 100%;
 }
@@ -3413,7 +3416,7 @@ body.filter-open .filter-sheet {
   font-weight: 700;
   padding: 0.65rem 1rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
   text-align: center;
   width: 100%;
   margin-top: 0.35rem;
@@ -3533,7 +3536,7 @@ body.filter-open .filter-sheet {
   -webkit-backdrop-filter: blur(24px);
   opacity: 0;
   pointer-events: none;
-  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.35s cubic-bezier(0.16, 1, 0.3, 1), color 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: pointer;
 }
 
@@ -3795,7 +3798,7 @@ body.filter-open .filter-sheet {
   padding: 0.3rem 0.55rem;
   border-radius: 4px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
   flex-shrink: 0;
 }
 
@@ -3859,7 +3862,7 @@ body.filter-open .filter-sheet {
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
   text-decoration: none;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
   cursor: pointer;
 }
 
@@ -3892,7 +3895,7 @@ body.filter-open .filter-sheet {
   padding: 0.5rem 0.85rem;
   border-radius: var(--radius-sm);
   text-decoration: none;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
   cursor: pointer;
 }
@@ -3980,7 +3983,7 @@ body.filter-open .filter-sheet {
   border: 1px solid var(--line);
   padding: 0.5rem 0.75rem;
   border-radius: var(--radius-sm);
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
 }
 
 .journal-search-wrap:focus-within {
@@ -4041,7 +4044,7 @@ body.filter-open .filter-sheet {
   border-radius: 6px;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.18s;
+  transition: background-color 0.18s, border-color 0.18s, color 0.18s, box-shadow 0.18s, transform 0.18s, opacity 0.18s;
 }
 
 .date-pill:hover {
@@ -4282,7 +4285,7 @@ body.filter-open .filter-sheet {
   border-radius: 6px;
   text-decoration: none;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
 }
 .btn-open-tv-ext:hover {
   background: #38bdf8;
@@ -4315,7 +4318,7 @@ body.filter-open .filter-sheet {
   padding: 0.65rem 1rem;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
   white-space: nowrap;
 }
 .btn-delete-trade:hover {
@@ -4574,7 +4577,7 @@ body.filter-open .filter-sheet {
   padding: 0.5rem 0.75rem;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4595,7 +4598,7 @@ body.filter-open .filter-sheet {
   padding: 0.5rem 0.75rem;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4637,7 +4640,7 @@ body.filter-open .filter-sheet {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .view-toggle-btn:hover {
@@ -4695,7 +4698,7 @@ body.filter-open .filter-sheet {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
 }
 
 .cal-nav-btn:hover {
@@ -4721,7 +4724,7 @@ body.filter-open .filter-sheet {
   padding: 0.25rem 0.55rem;
   border-radius: 4px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
 }
 
 .cal-today-btn:hover {
@@ -4777,7 +4780,7 @@ body.filter-open .filter-sheet {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: default;
 }
 
@@ -4972,7 +4975,7 @@ body.filter-open .filter-sheet {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
 }
 
 .btn-clear-cal-filter:hover {
@@ -5010,7 +5013,7 @@ body.filter-open .filter-sheet {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
 }
 
 .btn-debrief-trigger:hover {
@@ -5159,7 +5162,7 @@ body.filter-open .filter-sheet {
   flex-direction: column;
   align-items: center;
   gap: 0.25rem;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .debrief-grade-btn:hover {
@@ -5215,7 +5218,7 @@ body.filter-open .filter-sheet {
   padding: 0.4rem 0.75rem;
   border-radius: 999px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
 }
 
 .debrief-pill:hover {
@@ -5395,7 +5398,7 @@ body.filter-open .filter-sheet {
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: var(--radius-sm);
   backdrop-filter: blur(12px);
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .sample-data-control-bar:hover {
@@ -5422,7 +5425,7 @@ body.filter-open .filter-sheet {
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.02em;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .sample-status-pill.hidden-mode {
@@ -5453,7 +5456,7 @@ body.filter-open .filter-sheet {
   padding: 0.35rem 0.75rem;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .btn-toggle-demo:hover {
@@ -5474,7 +5477,7 @@ body.filter-open .filter-sheet {
   margin-bottom: 0.5rem;
   text-decoration: none;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .drawer-user-card:hover {
@@ -5509,7 +5512,7 @@ body.filter-open .filter-sheet {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-md);
   backdrop-filter: blur(12px);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1), color 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .dashboard-sample-banner.demo-active {
@@ -5540,7 +5543,7 @@ body.filter-open .filter-sheet {
   font-weight: 700;
   letter-spacing: 0.03em;
   white-space: nowrap;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .dashboard-sample-banner.demo-active .sample-banner-pill {
@@ -5578,7 +5581,7 @@ body.filter-open .filter-sheet {
   letter-spacing: 0.02em;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   flex-shrink: 0;
 }
 
@@ -5629,7 +5632,7 @@ body.filter-open .filter-sheet {
   justify-content: center;
   text-align: center;
   gap: 0.6rem;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .empty-playbook-box:hover {

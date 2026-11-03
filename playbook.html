@@ -14,7 +14,7 @@
   <!-- Firebase Auth SDK (v12) -->
   <script type="module" src="firebaseClient.js"></script>
   <script src="app.js" defer></script>
-  <script src="guardian.js"></script>
+  <script src="guardian.js" defer></script>
 </head>
 <body class="app-body">
 
@@ -45,20 +45,6 @@
 
   <main class="app-main">
     
-    <!-- Dashboard Sample Data / Live Ledger Status Banner -->
-    <div class="dashboard-sample-banner" id="dashboard-sample-banner">
-      <div class="sample-banner-left">
-        <span class="sample-banner-pill" id="dashboard-sample-pill">
-          <span class="status-indicator-dot"></span>
-          <span id="dashboard-sample-pill-text">Live Ledger: Real Trades Only</span>
-        </span>
-        <span class="sample-banner-hint" id="dashboard-sample-hint">Clean account ($0.00). Toggle sample data to explore benchmark trades and models.</span>
-      </div>
-      <button type="button" class="btn-dashboard-sample" id="dashboard-toggle-sample-btn">
-        <span id="dashboard-toggle-sample-label">Enable Sample Data</span>
-      </button>
-    </div>
-
     <!-- Playbook KPIs / Edge Digest -->
     <section class="playbook-stats-bar">
       <div class="digest-card">
@@ -104,7 +90,7 @@
 
     <!-- Playbook Cards Grid -->
     <div class="playbook-grid" id="playbook-grid">
-      <!-- Rendered dynamically by app.js based on auth & sample data status -->
+      <!-- Rendered dynamically by app.js -->
     </div>
   </main>
 

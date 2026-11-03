@@ -14,7 +14,7 @@
   <!-- Firebase Auth SDK (v12) -->
   <script type="module" src="firebaseClient.js"></script>
   <script src="app.js" defer></script>
-  <script src="guardian.js"></script>
+  <script src="guardian.js" defer></script>
 </head>
 <body class="app-body">
 
@@ -41,20 +41,6 @@
 
   <main class="app-main">
     
-    <!-- Dashboard Sample Data / Live Ledger Status Banner -->
-    <div class="dashboard-sample-banner" id="dashboard-sample-banner">
-      <div class="sample-banner-left">
-        <span class="sample-banner-pill" id="dashboard-sample-pill">
-          <span class="status-indicator-dot"></span>
-          <span id="dashboard-sample-pill-text">Live Ledger: Real Trades Only</span>
-        </span>
-        <span class="sample-banner-hint" id="dashboard-sample-hint">Clean account ($0.00). Toggle sample data to explore benchmark analytics.</span>
-      </div>
-      <button type="button" class="btn-dashboard-sample" id="dashboard-toggle-sample-btn">
-        <span id="dashboard-toggle-sample-label">Enable Sample Data</span>
-      </button>
-    </div>
-
     <!-- Timeframe Filter Tabs (Interactive) -->
     <div class="journal-tabs timeframe-tabs" id="analytics-timeframe-tabs">
       <button class="tab-btn active" data-period="this_month">This Month</button>
@@ -112,11 +98,11 @@
 
       <!-- Point-in-time Scrub Callout -->
       <div class="chart-scrub-callout" id="chart-scrub-callout">
-        <span class="callout-point" id="callout-point">Wk 3</span>
+        <span class="callout-point" id="callout-point">Wk 1</span>
         <div class="callout-details">
-          <span>Actual: <strong id="callout-actual">+$2,400</strong></span>
-          <span>Ideal: <strong id="callout-ideal" class="green">+$4,200</strong></span>
-          <span class="callout-gap">Gap: <strong id="callout-gap" class="danger">-$1,800</strong></span>
+          <span>Actual: <strong id="callout-actual">$0.00</strong></span>
+          <span>Ideal: <strong id="callout-ideal" class="green">$0.00</strong></span>
+          <span class="callout-gap">Gap: <strong id="callout-gap" class="danger">$0.00</strong></span>
         </div>
       </div>
 
@@ -156,7 +142,7 @@
       </div>
 
       <div class="fomo-tax-alert" id="fomo-tax-alert-box">
-        <strong>The FOMO Tax:</strong> You paid <span id="fomo-tax-amount">$1,850</span> to your broker this period by breaking your own rules.
+        <strong>The FOMO Tax:</strong> You paid <span id="fomo-tax-amount">$0.00</span> to your broker this period by breaking your own rules.
       </div>
     </section>
 
@@ -176,23 +162,14 @@
               <svg class="chevron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </div>
             <div class="unit-cost-sub">
-              <span id="m1-count">12 Occurrences</span> · <span class="unit-leak-badge" id="m1-leak">-$91.67 / breach</span>
+              <span id="m1-count">0 Occurrences</span> · <span class="unit-leak-badge" id="m1-leak">$0.00 / breach</span>
             </div>
           </div>
-          <div class="mistake-cost loss" id="m1-cost">-$1,100</div>
+          <div class="mistake-cost loss" id="m1-cost">$0.00</div>
         </div>
         <div class="mistake-drawer" id="m1-drawer">
           <div class="drawer-inner">
-            <div class="sample-trade-row">
-              <span class="st-date">Oct 02</span>
-              <span class="st-asset">NQ1! Short</span>
-              <span class="st-loss">-$340</span>
-            </div>
-            <div class="sample-trade-row">
-              <span class="st-date">Sep 28</span>
-              <span class="st-asset">XAUUSD Long</span>
-              <span class="st-loss">-$220</span>
-            </div>
+            <div class="empty-drawer-note" style="color: var(--ink-muted); font-size: 0.78rem; padding: 0.5rem 0;">No breach trades recorded</div>
             <a href="journal.html" class="drawer-action-btn">View Breaches in Journal →</a>
           </div>
         </div>
@@ -207,23 +184,14 @@
               <svg class="chevron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </div>
             <div class="unit-cost-sub">
-              <span id="m2-count">4 Occurrences</span> · <span class="unit-leak-badge" id="m2-leak">-$112.50 / breach</span>
+              <span id="m2-count">0 Occurrences</span> · <span class="unit-leak-badge" id="m2-leak">$0.00 / breach</span>
             </div>
           </div>
-          <div class="mistake-cost loss" id="m2-cost">-$450</div>
+          <div class="mistake-cost loss" id="m2-cost">$0.00</div>
         </div>
         <div class="mistake-drawer" id="m2-drawer">
           <div class="drawer-inner">
-            <div class="sample-trade-row">
-              <span class="st-date">Oct 01</span>
-              <span class="st-asset">EURUSD Long</span>
-              <span class="st-loss">-$150</span>
-            </div>
-            <div class="sample-trade-row">
-              <span class="st-date">Sep 24</span>
-              <span class="st-asset">NQ1! Short</span>
-              <span class="st-loss">-$300</span>
-            </div>
+            <div class="empty-drawer-note" style="color: var(--ink-muted); font-size: 0.78rem; padding: 0.5rem 0;">No breach trades recorded</div>
             <a href="journal.html" class="drawer-action-btn">View Breaches in Journal →</a>
           </div>
         </div>
@@ -238,18 +206,14 @@
               <svg class="chevron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </div>
             <div class="unit-cost-sub">
-              <span id="m3-count">3 Occurrences</span> · <span class="unit-leak-badge" id="m3-leak">-$100.00 / breach</span>
+              <span id="m3-count">0 Occurrences</span> · <span class="unit-leak-badge" id="m3-leak">$0.00 / breach</span>
             </div>
           </div>
-          <div class="mistake-cost loss" id="m3-cost">-$300</div>
+          <div class="mistake-cost loss" id="m3-cost">$0.00</div>
         </div>
         <div class="mistake-drawer" id="m3-drawer">
           <div class="drawer-inner">
-            <div class="sample-trade-row">
-              <span class="st-date">Sep 29</span>
-              <span class="st-asset">XAUUSD Short</span>
-              <span class="st-loss">-$110 (Lost Upside)</span>
-            </div>
+            <div class="empty-drawer-note" style="color: var(--ink-muted); font-size: 0.78rem; padding: 0.5rem 0;">No breach trades recorded</div>
             <a href="journal.html" class="drawer-action-btn">View Breaches in Journal →</a>
           </div>
         </div>
@@ -263,26 +227,26 @@
       <div class="edge-grid">
         <div class="edge-item">
           <span class="edge-name" id="edge-name-1">London Session</span>
-          <div class="edge-bar-bg"><div class="edge-bar fill-green" id="edge-bar-1" style="width: 72%;"></div></div>
-          <span class="edge-val" id="edge-val-1">72%</span>
+          <div class="edge-bar-bg"><div class="edge-bar fill-green" id="edge-bar-1" style="width: 0%;"></div></div>
+          <span class="edge-val" id="edge-val-1">--%</span>
         </div>
         
         <div class="edge-item">
           <span class="edge-name" id="edge-name-2">A+ Reversal Setup</span>
-          <div class="edge-bar-bg"><div class="edge-bar fill-green" id="edge-bar-2" style="width: 68%;"></div></div>
-          <span class="edge-val" id="edge-val-2">68%</span>
+          <div class="edge-bar-bg"><div class="edge-bar fill-green" id="edge-bar-2" style="width: 0%;"></div></div>
+          <span class="edge-val" id="edge-val-2">--%</span>
         </div>
         
         <div class="edge-item">
           <span class="edge-name" id="edge-name-3">Trend Continuation</span>
-          <div class="edge-bar-bg"><div class="edge-bar fill-yellow" id="edge-bar-3" style="width: 54%;"></div></div>
-          <span class="edge-val" id="edge-val-3">54%</span>
+          <div class="edge-bar-bg"><div class="edge-bar fill-yellow" id="edge-bar-3" style="width: 0%;"></div></div>
+          <span class="edge-val" id="edge-val-3">--%</span>
         </div>
         
         <div class="edge-item">
           <span class="edge-name" id="edge-name-4">Asian Session</span>
-          <div class="edge-bar-bg"><div class="edge-bar fill-red" id="edge-bar-4" style="width: 28%;"></div></div>
-          <span class="edge-val" id="edge-val-4">28%</span>
+          <div class="edge-bar-bg"><div class="edge-bar fill-red" id="edge-bar-4" style="width: 0%;"></div></div>
+          <span class="edge-val" id="edge-val-4">--%</span>
         </div>
       </div>
     </section>
