@@ -26,6 +26,7 @@ import {
   getFirestore,
   collection,
   doc,
+  getDoc,
   getDocs,
   setDoc,
   deleteDoc,
@@ -549,11 +550,36 @@ const DMA_DB = {
         localStorage.setItem('dma_trades', '[]');
       }
 
+      // 3. Sync Preferences (Timezone, Trading Style)
+      try {
+        const uDoc = await getDoc(doc(db, 'users', uid));
+        if (uDoc.exists() && uDoc.data().preferences) {
+          localStorage.setItem('dma_user_preferences', JSON.stringify(uDoc.data().preferences));
+        }
+      } catch (_) {}
+
       // Dispatch event to refresh app views
       window.dispatchEvent(new CustomEvent('dma-data-synced'));
     } catch (err) {
       console.warn('[DMA Firestore] Sync error:', err);
     }
+  },
+
+  /**
+   * Save user preferences (timezone, trading style, name) to Cloud Firestore
+   */
+  async savePreferences(prefs) {
+    const user = auth?.currentUser;
+    if (user && db) {
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        await setDoc(userRef, { preferences: prefs }, { merge: true });
+      } catch (err) {
+        console.warn('[DMA Firestore] Error saving preferences:', err);
+      }
+    }
+    localStorage.setItem('dma_user_preferences', JSON.stringify(prefs));
+    return prefs;
   }
 };
 

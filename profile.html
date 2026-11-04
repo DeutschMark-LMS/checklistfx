@@ -26,32 +26,41 @@
       <span class="profile-title">Profile</span>
     </div>
 
-    <button class="icon-btn" aria-label="Settings" data-route="profile.html#settings">
-      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.86l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.15V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9.4 19.4a1.7 1.7 0 0 0-1-.6 1.7 1.7 0 0 0-1.15.4l-.06.06A2 2 0 1 1 4.36 16.4l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.15-.4H2.76a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0 .4-1.15V7.76a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 9.4 9a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.15V7.16a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 14.6 9a1.7 1.7 0 0 0 1 .6 1.7 1.7 0 0 0 1.15-.4l.06-.06A2 2 0 1 1 19.64 11.6l-.06.06A1.7 1.7 0 0 0 19.4 13c.2.3.31.66.31 1.02s-.11.72-.31 1.02z"></path></svg>
-    </button>
+    <div class="header-actions" style="display: flex; align-items: center; gap: 0.5rem;">
+      <a href="https://wa.me/2349073113872?text=Hello%20Checklist%20Fx%20Team%2C%20I%20have%20feedback%20regarding%20the%20Beta%3A" target="_blank" rel="noopener noreferrer" class="app-header-feedback-btn" title="Send Feedback on WhatsApp">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.694.072-2.126-.521-1.614-.668-2.679-2.316-2.76-2.424-.08-.108-.65-0.865-.65-1.651 0-.786.411-1.173.557-1.332.146-.16.321-.2.428-.2.107 0 .214.001.307.006.099.005.231-.037.362.276.136.324.464 1.134.505 1.217.04.083.067.18.013.288-.054.108-.081.175-.161.27-.08.094-.17.21-.242.282-.08.08-.163.167-.07.327.094.16.417.689.896 1.116.617.549 1.137.72 1.298.8.161.08.255.07.35-.04.094-.109.404-.471.512-.633.108-.161.216-.135.362-.081.147.054.93.439 1.09.52.161.08.269.12.308.187.04.066.04.385-.104.79zM12 2C6.477 2 2 6.477 2 12c0 1.891.524 3.66 1.434 5.176L2 22l4.957-1.398A9.956 9.956 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
+        <span>Feedback</span>
+      </a>
+      <button class="icon-btn" aria-label="Settings" data-route="profile.html#settings">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.86l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.15V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9.4 19.4a1.7 1.7 0 0 0-1-.6 1.7 1.7 0 0 0-1.15.4l-.06.06A2 2 0 1 1 4.36 16.4l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.15-.4H2.76a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0 .4-1.15V7.76a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 9.4 9a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.15V7.16a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 14.6 9a1.7 1.7 0 0 0 1 .6 1.7 1.7 0 0 0 1.15-.4l.06-.06A2 2 0 1 1 19.64 11.6l-.06.06A1.7 1.7 0 0 0 19.4 13c.2.3.31.66.31 1.02s-.11.72-.31 1.02z"></path></svg>
+      </button>
+    </div>
   </header>
 
   <main class="app-main profile-main">
     <section class="profile-card">
-      <div class="profile-avatar" id="profile-avatar">JT</div>
+      <div class="profile-avatar" id="profile-avatar">TR</div>
       <div class="profile-meta">
         <h2 id="profile-name-display">Jason Trader</h2>
         <p id="profile-email-display">@jasondma</p>
+        <div style="margin-top: 0.35rem;">
+          <span class="profile-style-pill" id="profile-style-badge">Momentum + Breakout</span>
+        </div>
       </div>
     </section>
 
     <section class="profile-stats">
       <div class="mini-stat">
         <span class="label">Win Rate</span>
-        <strong>62%</strong>
+        <strong id="profile-stat-winrate">--%</strong>
       </div>
       <div class="mini-stat">
         <span class="label">Trades</span>
-        <strong>184</strong>
+        <strong id="profile-stat-trades">0</strong>
       </div>
       <div class="mini-stat">
         <span class="label">Best Setup</span>
-        <strong>A+</strong>
+        <strong id="profile-stat-best-setup">--</strong>
       </div>
     </section>
 
@@ -68,7 +77,7 @@
           <small>Trade alerts and checklist reminders</small>
         </div>
         <label class="toggle">
-          <input type="checkbox" checked>
+          <input type="checkbox" checked id="setting-toggle-notifications">
           <span class="slider"></span>
         </label>
       </div>
@@ -79,7 +88,7 @@
           <small>Always on</small>
         </div>
         <label class="toggle">
-          <input type="checkbox" checked>
+          <input type="checkbox" checked id="setting-toggle-darkmode">
           <span class="slider"></span>
         </label>
       </div>
@@ -90,23 +99,25 @@
           <small>Before execution</small>
         </div>
         <label class="toggle">
-          <input type="checkbox" checked>
+          <input type="checkbox" checked id="setting-toggle-risk">
           <span class="slider"></span>
         </label>
       </div>
 
-      <div class="setting-row compact">
+      <div class="setting-row compact" id="setting-row-timezone" style="cursor: pointer;" data-action="open-profile-editor">
         <div>
           <span class="setting-title">Timezone</span>
-          <small>America/New_York</small>
+          <small id="profile-timezone-display">America/New_York</small>
         </div>
+        <span style="font-size: 0.75rem; color: var(--ink-muted);">Tap to Change &rsaquo;</span>
       </div>
 
-      <div class="setting-row compact">
+      <div class="setting-row compact" id="setting-row-style" style="cursor: pointer;" data-action="open-profile-editor">
         <div>
           <span class="setting-title">Trading style</span>
-          <small>Momentum + Breakout</small>
+          <small id="profile-style-display">Momentum + Breakout</small>
         </div>
+        <span style="font-size: 0.75rem; color: var(--ink-muted);">Tap to Change &rsaquo;</span>
       </div>
     </section>
 
@@ -218,19 +229,24 @@
       <div class="form-group">
         <label for="profile-timezone">Timezone</label>
         <select id="profile-timezone">
-          <option selected>America/New_York</option>
-          <option>Europe/London</option>
-          <option>Asia/Tokyo</option>
+          <option value="America/New_York">America/New_York (EST / New York)</option>
+          <option value="Europe/London">Europe/London (GMT / London)</option>
+          <option value="Europe/Frankfurt">Europe/Frankfurt (CET / Frankfurt)</option>
+          <option value="Asia/Tokyo">Asia/Tokyo (JST / Tokyo)</option>
+          <option value="Asia/Dubai">Asia/Dubai (GST / Dubai)</option>
+          <option value="Australia/Sydney">Australia/Sydney (AEST / Sydney)</option>
+          <option value="UTC">UTC (Universal Time)</option>
         </select>
       </div>
 
       <div class="form-group">
         <label for="profile-style">Trading style</label>
         <select id="profile-style">
-          <option selected>Momentum + Breakout</option>
-          <option>Trend Following</option>
-          <option>Reversal</option>
-          <option>Scalp</option>
+          <option value="Momentum + Breakout">Momentum + Breakout</option>
+          <option value="Trend Following">Trend Following</option>
+          <option value="Reversal / Mean Reversion">Reversal / Mean Reversion</option>
+          <option value="Scalping">Scalping</option>
+          <option value="Swing Trading">Swing Trading</option>
         </select>
       </div>
 

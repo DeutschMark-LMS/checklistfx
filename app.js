@@ -48,8 +48,101 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Sync Firebase / active user to side drawer & headers
+  // ==========================================================================
+  // PROFILE & USER CONTEXT ENGINE (WITH PERSISTENT PREFERENCES & STATS)
+  // ==========================================================================
+  function getUserPreferences() {
+    try {
+      const raw = localStorage.getItem('dma_user_preferences');
+      if (raw) return JSON.parse(raw);
+    } catch (_) {}
+    return {
+      name: 'Jason Trader',
+      handle: '@jasondma',
+      timezone: 'America/New_York',
+      style: 'Momentum + Breakout',
+      notifications: true,
+      darkMode: true,
+      riskReminders: true
+    };
+  }
+
+  function saveUserPreferences(prefs) {
+    try {
+      const current = getUserPreferences();
+      const updated = { ...current, ...prefs };
+      localStorage.setItem('dma_user_preferences', JSON.stringify(updated));
+      if (window.DMA_DB && typeof window.DMA_DB.savePreferences === 'function') {
+        window.DMA_DB.savePreferences(updated);
+      }
+      window.dispatchEvent(new CustomEvent('dma-preferences-updated', { detail: updated }));
+      return updated;
+    } catch (err) {
+      console.warn('Failed to save preferences:', err);
+    }
+  }
+
+  // Calculate and sync dynamic profile statistics from real trades
+  function syncProfileStats() {
+    const winRateEl = document.getElementById('profile-stat-winrate');
+    const tradesEl = document.getElementById('profile-stat-trades');
+    const bestSetupEl = document.getElementById('profile-stat-best-setup');
+    if (!winRateEl && !tradesEl && !bestSetupEl) return;
+
+    let trades = [];
+    try {
+      trades = JSON.parse(localStorage.getItem('dma_trades') || '[]');
+    } catch (_) {}
+
+    const total = trades.length;
+    if (total === 0) {
+      if (winRateEl) winRateEl.textContent = '--%';
+      if (tradesEl) tradesEl.textContent = '0';
+      if (bestSetupEl) bestSetupEl.textContent = '--';
+      return;
+    }
+
+    let wins = 0;
+    const stratStats = {};
+
+    trades.forEach(t => {
+      const pnl = Number(t.pnl) || 0;
+      const isWin = pnl > 0;
+      if (isWin) wins++;
+
+      const strat = t.strategy || (t.strategyKey ? (t.strategyKey === 'trend' ? 'Trend Continuation' : (t.strategyKey === 'impulse' ? 'Impulse Entry' : 'A+ Reversal')) : 'Systematic Setup');
+      if (!stratStats[strat]) {
+        stratStats[strat] = { total: 0, wins: 0, pnl: 0 };
+      }
+      stratStats[strat].total++;
+      if (isWin) stratStats[strat].wins++;
+      stratStats[strat].pnl += pnl;
+    });
+
+    const winRate = Math.round((wins / total) * 100);
+
+    // Find best setup by highest win rate (and positive PnL)
+    let bestSetup = '--';
+    let bestRate = -1;
+    let highestPnl = -Infinity;
+
+    Object.entries(stratStats).forEach(([name, stat]) => {
+      const rate = (stat.wins / stat.total) * 100;
+      if (rate > bestRate || (rate === bestRate && stat.pnl > highestPnl)) {
+        bestRate = rate;
+        highestPnl = stat.pnl;
+        bestSetup = name;
+      }
+    });
+
+    if (winRateEl) winRateEl.textContent = `${winRate}%`;
+    if (tradesEl) tradesEl.textContent = String(total);
+    if (bestSetupEl) bestSetupEl.textContent = bestSetup;
+  }
+
+  // Sync Firebase / active user to side drawer, headers, and profile screen
   function syncGlobalUserContext() {
+    const prefs = getUserPreferences();
     let user = null;
     if (typeof window.DMA_AUTH !== 'undefined') {
       user = window.DMA_AUTH.getUser();
@@ -59,19 +152,142 @@ document.addEventListener('DOMContentLoaded', () => {
         user = JSON.parse(localStorage.getItem('dma_active_user') || localStorage.getItem('dma_user') || 'null');
       } catch (_) {}
     }
-    if (user) {
-      const email = user.email || 'trader@dma.com';
-      const name = user.user_metadata?.full_name || email.split('@')[0] || 'Jason Trader';
-      const handle = user.user_metadata?.handle ? (user.user_metadata.handle.startsWith('@') ? user.user_metadata.handle : '@' + user.user_metadata.handle) : ('@' + email.split('@')[0]);
-      const initials = name.slice(0, 2).toUpperCase();
 
-      document.querySelectorAll('#drawer-user-avatar, #profile-avatar').forEach(el => el.textContent = initials);
-      document.querySelectorAll('#drawer-user-name, #profile-name-display').forEach(el => el.textContent = name);
-      document.querySelectorAll('#drawer-user-email, #profile-email-display').forEach(el => el.textContent = handle);
-    }
+    const email = user?.email || 'trader@dma.com';
+    const name = prefs.name || user?.user_metadata?.full_name || email.split('@')[0] || 'Trader';
+    const handle = prefs.handle || user?.user_metadata?.handle || ('@' + email.split('@')[0]);
+    const timezone = prefs.timezone || 'America/New_York';
+    const style = prefs.style || 'Momentum + Breakout';
+    const initials = name.slice(0, 2).toUpperCase();
+
+    // Drawer and profile avatars & headers
+    document.querySelectorAll('#drawer-user-avatar, #profile-avatar').forEach(el => el.textContent = initials);
+    document.querySelectorAll('#drawer-user-name, #profile-name-display').forEach(el => el.textContent = name);
+    document.querySelectorAll('#drawer-user-email, #profile-email-display').forEach(el => el.textContent = handle);
+
+    // Profile page specific elements
+    const timezoneDisplay = document.getElementById('profile-timezone-display');
+    const styleDisplay = document.getElementById('profile-style-display');
+    const styleBadge = document.getElementById('profile-style-badge');
+
+    if (timezoneDisplay) timezoneDisplay.textContent = timezone;
+    if (styleDisplay) styleDisplay.textContent = style;
+    if (styleBadge) styleBadge.textContent = style;
+
+    // Sync modal fields
+    const inputName = document.getElementById('profile-name');
+    const inputHandle = document.getElementById('profile-handle');
+    const selectTimezone = document.getElementById('profile-timezone');
+    const selectStyle = document.getElementById('profile-style');
+
+    if (inputName) inputName.value = name;
+    if (inputHandle) inputHandle.value = handle;
+    if (selectTimezone) selectTimezone.value = timezone;
+    if (selectStyle) selectStyle.value = style;
+
+    // Sync toggles
+    const toggleNotif = document.getElementById('setting-toggle-notifications');
+    const toggleDark = document.getElementById('setting-toggle-darkmode');
+    const toggleRisk = document.getElementById('setting-toggle-risk');
+    if (toggleNotif && prefs.notifications !== undefined) toggleNotif.checked = prefs.notifications;
+    if (toggleDark && prefs.darkMode !== undefined) toggleDark.checked = prefs.darkMode;
+    if (toggleRisk && prefs.riskReminders !== undefined) toggleRisk.checked = prefs.riskReminders;
+
+    // Refresh dynamic stats
+    syncProfileStats();
   }
+
   syncGlobalUserContext();
   window.addEventListener('dma-auth-changed', syncGlobalUserContext);
+  window.addEventListener('dma-data-synced', syncGlobalUserContext);
+  window.addEventListener('dma-preferences-updated', syncGlobalUserContext);
+  window.addEventListener('storage', syncGlobalUserContext);
+
+  // Settings Toggles Listener
+  document.getElementById('setting-toggle-notifications')?.addEventListener('change', (e) => {
+    saveUserPreferences({ notifications: e.target.checked });
+  });
+  document.getElementById('setting-toggle-darkmode')?.addEventListener('change', (e) => {
+    saveUserPreferences({ darkMode: e.target.checked });
+  });
+  document.getElementById('setting-toggle-risk')?.addEventListener('change', (e) => {
+    saveUserPreferences({ riskReminders: e.target.checked });
+  });
+
+  // Profile Modal & Editor
+  const profileModal = document.getElementById('profile-modal');
+
+  const openProfileEditor = () => {
+    if (!profileModal) return;
+    syncGlobalUserContext(); // Pre-populate with freshest state
+    profileModal.classList.remove('hidden');
+    profileModal.setAttribute('aria-hidden', 'false');
+  };
+
+  const closeProfileEditor = () => {
+    if (!profileModal) return;
+    profileModal.classList.add('hidden');
+    profileModal.setAttribute('aria-hidden', 'true');
+  };
+
+  document.querySelectorAll('[data-action="open-profile-editor"]').forEach(btn => {
+    btn.addEventListener('click', openProfileEditor);
+  });
+
+  document.querySelectorAll('[data-action="close-profile-editor"]').forEach(btn => {
+    btn.addEventListener('click', closeProfileEditor);
+  });
+
+  if (profileModal) {
+    profileModal.addEventListener('click', (event) => {
+      if (event.target === profileModal) closeProfileEditor();
+    });
+  }
+
+  const saveProfileButton = document.querySelector('[data-action="save-profile-editor"]');
+  if (saveProfileButton) {
+    saveProfileButton.addEventListener('click', () => {
+      const nextName = document.getElementById('profile-name')?.value.trim() || 'Jason Trader';
+      const rawHandle = document.getElementById('profile-handle')?.value.trim() || '@jasondma';
+      const nextHandle = rawHandle.startsWith('@') ? rawHandle : '@' + rawHandle;
+      const nextTimezone = document.getElementById('profile-timezone')?.value || 'America/New_York';
+      const nextStyle = document.getElementById('profile-style')?.value || 'Momentum + Breakout';
+
+      saveUserPreferences({
+        name: nextName,
+        handle: nextHandle,
+        timezone: nextTimezone,
+        style: nextStyle
+      });
+
+      syncGlobalUserContext();
+      closeProfileEditor();
+
+      // Show sleek confirmation toast
+      const toast = document.createElement('div');
+      toast.className = 'profile-saved-toast';
+      toast.textContent = '✓ Profile & timezone saved successfully';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 2500);
+    });
+  }
+
+  // Profile Logout Handler
+  const profileLogoutBtn = document.getElementById('profile-logout-btn');
+  if (profileLogoutBtn) {
+    profileLogoutBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      profileLogoutBtn.disabled = true;
+      profileLogoutBtn.textContent = 'Logging out...';
+      if (window.DMA_AUTH && typeof window.DMA_AUTH.signOut === 'function') {
+        await window.DMA_AUTH.signOut();
+      } else {
+        localStorage.removeItem('checklist-auth');
+        localStorage.removeItem('dma_active_user');
+      }
+      window.location.href = 'login.html';
+    });
+  }
 
   const authForms = document.querySelectorAll('[data-auth-form]');
   authForms.forEach((form) => {
@@ -100,59 +316,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
-
-  const profileModal = document.getElementById('profile-modal');
-  const profileName = document.querySelector('.profile-meta h2');
-  const profileHandle = document.querySelector('.profile-meta p');
-
-  const openProfileEditor = () => {
-    if (!profileModal) return;
-    profileModal.classList.remove('hidden');
-    profileModal.setAttribute('aria-hidden', 'false');
-  };
-
-  const closeProfileEditor = () => {
-    if (!profileModal) return;
-    profileModal.classList.add('hidden');
-    profileModal.setAttribute('aria-hidden', 'true');
-  };
-
-  const profileEditorButton = document.querySelector('[data-action="open-profile-editor"]');
-  if (profileEditorButton) {
-    profileEditorButton.addEventListener('click', openProfileEditor);
-  }
-
-  const profileEditorCloseButtons = document.querySelectorAll('[data-action="close-profile-editor"]');
-  profileEditorCloseButtons.forEach((button) => {
-    button.addEventListener('click', closeProfileEditor);
-  });
-
-  const saveProfileButton = document.querySelector('[data-action="save-profile-editor"]');
-  if (saveProfileButton) {
-    saveProfileButton.addEventListener('click', () => {
-      const nextName = document.getElementById('profile-name')?.value || 'Jason Trader';
-      const nextHandle = document.getElementById('profile-handle')?.value || '@jasondma';
-      const nextTimezone = document.getElementById('profile-timezone')?.value || 'America/New_York';
-      const nextStyle = document.getElementById('profile-style')?.value || 'Momentum + Breakout';
-
-      if (profileName) profileName.textContent = nextName;
-      if (profileHandle) profileHandle.textContent = nextHandle;
-
-      const timezoneNode = document.querySelector('.setting-row.compact:nth-of-type(1) small');
-      const styleNode = document.querySelector('.setting-row.compact:nth-of-type(2) small');
-
-      if (timezoneNode) timezoneNode.textContent = nextTimezone;
-      if (styleNode) styleNode.textContent = nextStyle;
-
-      closeProfileEditor();
-    });
-  }
-
-  if (profileModal) {
-    profileModal.addEventListener('click', (event) => {
-      if (event.target === profileModal) closeProfileEditor();
-    });
-  }
 
   // Allow the dashboard to open in preview mode without forcing a login redirect.
   // The login/signup pages remain available for the product flow when needed.
@@ -288,13 +451,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const rMult = t.rMultiple || (isWin ? '+2.2R' : '-1.0R');
       const strategyTitle = t.strategy || (t.strategyKey === 'trend' ? 'Trend Continuation' : (t.strategyKey === 'impulse' ? 'Impulse Entry' : 'A+ Reversal'));
 
+      const userTz = getUserPreferences().timezone;
+      let displayTime = t.date || 'Today';
+      if (t.timestamp) {
+        try {
+          displayTime = new Date(t.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: userTz });
+        } catch (_) {}
+      }
+
       card.className = `trade-card ${t.isCompliant ? 'followed' : 'broken'}`;
       card.setAttribute('data-trade-id', t.id || Date.now());
       card.setAttribute('data-asset', t.asset || 'XAUUSD');
       card.setAttribute('data-direction', (t.direction || 'long').toLowerCase());
       card.setAttribute('data-setup', t.strategyKey || 'reversal');
       card.setAttribute('data-date', dateAttr);
-      card.setAttribute('data-time', t.date || 'Today');
+      card.setAttribute('data-time', displayTime);
       card.setAttribute('data-timestamp', t.timestamp || Date.now());
       card.setAttribute('data-pnl', pnlNum);
       card.setAttribute('data-rmult', rMult);
@@ -338,7 +509,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="trade-pnl ${isWin ? 'win' : 'loss'}">${pnlFormatted}</div>
         </div>
         <div class="trade-meta">
-          <span class="time">${t.date || 'Today'}</span>
+          <span class="time">${displayTime}</span>
           <span class="setup-name">${strategyTitle}</span>
         </div>
         <div class="trade-tags">
@@ -2474,7 +2645,7 @@ if (logTradeForm) {
       breachReason,
       screenshotUrl,
       notes: isCompliant ? 'Executed with 100% adherence to playbook confluences.' : `Rule breach detected: ${breachReason || 'Confluences missed'}`,
-      date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: getUserPreferences().timezone }),
       timestamp: Date.now()
     };
 
