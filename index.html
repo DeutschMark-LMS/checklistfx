@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
   
   <link rel="stylesheet" href="style.css">
-  <script src="app.js" defer></script>
+  <script src="app.js?v=v2.5" defer></script>
   <script src="guardian.js" defer></script>
 </head>
 <body>
@@ -21,8 +21,8 @@
   <div class="beta-top-banner">
     <div class="container beta-banner-content">
       <span class="beta-tag">PUBLIC BETA</span>
-      <span class="beta-desc">Checklist Fx is in Beta Testing mode. Help shape the platform with your feedback.</span>
-      <a href="https://wa.me/2349073113872?text=Hello%20Checklist%20Fx%20Team%2C%20I%20have%20feedback%20regarding%20the%20Beta%3A" target="_blank" rel="noopener noreferrer" class="beta-wa-btn">
+      <span class="beta-desc">Checklist Fx is in Beta Testing mode &bull; Free early access</span>
+      <a href="https://wa.me/2349073113872?text=Hello%20Checklist%20Fx%20Team%2C%20I%20have%20feedback%20regarding%20the%20Beta%3A" target="_blank" rel="noopener noreferrer" class="beta-wa-btn hide-mobile">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.694.072-2.126-.521-1.614-.668-2.679-2.316-2.76-2.424-.08-.108-.65-0.865-.65-1.651 0-.786.411-1.173.557-1.332.146-.16.321-.2.428-.2.107 0 .214.001.307.006.099.005.231-.037.362.276.136.324.464 1.134.505 1.217.04.083.067.18.013.288-.054.108-.081.175-.161.27-.08.094-.17.21-.242.282-.08.08-.163.167-.07.327.094.16.417.689.896 1.116.617.549 1.137.72 1.298.8.161.08.255.07.35-.04.094-.109.404-.471.512-.633.108-.161.216-.135.362-.081.147.054.93.439 1.09.52.161.08.269.12.308.187.04.066.04.385-.104.79zM12 2C6.477 2 2 6.477 2 12c0 1.891.524 3.66 1.434 5.176L2 22l4.957-1.398A9.956 9.956 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
         <span>WhatsApp Feedback</span>
       </a>
@@ -32,18 +32,18 @@
   <!-- Mobile-First Navigation -->
   <nav class="navbar">
     <div class="nav-container">
-      <a href="index.html" class="logo">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+      <a href="index.html" class="logo" aria-label="Checklist Fx">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
         <span>Checklist</span>
         <span class="logo-beta-tag">BETA</span>
       </a>
       <div class="nav-actions">
-        <a href="https://wa.me/2349073113872?text=Hello%20Checklist%20Fx%20Team%2C%20I%20have%20feedback%20regarding%20the%20Beta%3A" target="_blank" rel="noopener noreferrer" class="btn btn-sm nav-feedback-btn" title="Give Feedback on WhatsApp">
+        <a href="https://wa.me/2349073113872?text=Hello%20Checklist%20Fx%20Team%2C%20I%20have%20feedback%20regarding%20the%20Beta%3A" target="_blank" rel="noopener noreferrer" class="nav-feedback-btn" title="Give Feedback on WhatsApp" aria-label="Feedback on WhatsApp">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.694.072-2.126-.521-1.614-.668-2.679-2.316-2.76-2.424-.08-.108-.65-0.865-.65-1.651 0-.786.411-1.173.557-1.332.146-.16.321-.2.428-.2.107 0 .214.001.307.006.099.005.231-.037.362.276.136.324.464 1.134.505 1.217.04.083.067.18.013.288-.054.108-.081.175-.161.27-.08.094-.17.21-.242.282-.08.08-.163.167-.07.327.094.16.417.689.896 1.116.617.549 1.137.72 1.298.8.161.08.255.07.35-.04.094-.109.404-.471.512-.633.108-.161.216-.135.362-.081.147.054.93.439 1.09.52.161.08.269.12.308.187.04.066.04.385-.104.79zM12 2C6.477 2 2 6.477 2 12c0 1.891.524 3.66 1.434 5.176L2 22l4.957-1.398A9.956 9.956 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
           <span class="feedback-btn-text">Feedback</span>
         </a>
-        <a href="login.html" class="btn btn-ghost btn-sm nav-login-btn" data-route="login.html">Log in</a>
-        <a href="signup.html" class="btn btn-sm btn-primary nav-signup-btn" data-route="signup.html">Join Beta</a>
+        <a href="login.html" class="nav-login-btn" data-route="login.html">Log in</a>
+        <a href="signup.html" class="btn btn-primary nav-signup-btn" data-route="signup.html">Join Beta</a>
       </div>
     </div>
   </nav>
@@ -54,7 +54,7 @@
       <div class="hero-content">
         <div class="hero-badge beta-hero-badge">
           <span class="beta-pulse-dot"></span>
-          <span>BETA TESTING • FREE EARLY ACCESS</span>
+          <span>PUBLIC BETA ACCESS</span>
         </div>
         <h1 class="hero-title">Track your confluences.<br>Master your <span class="highlight-red">discipline.</span></h1>
         <p class="hero-subtitle">The only trading journal that actually measures the cost of your indiscipline. Stop paying the FOMO tax, track which confluences yield the highest win rate, and see exactly what happens when you break your rules.</p>
@@ -219,7 +219,7 @@
       </div>
       <h2>Ready to execute like a machine?</h2>
       <p>Join the traders testing the confluence journal and eliminating the FOMO tax.</p>
-      <div class="bottom-cta-buttons" style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; margin-top: 1.5rem;">
+      <div class="bottom-cta-buttons">
         <a href="signup.html" class="btn btn-lg btn-primary" data-route="signup.html">Join Free Beta</a>
         <a href="login.html" class="btn btn-lg btn-ghost" data-route="login.html">Log In to Account</a>
       </div>

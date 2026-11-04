@@ -525,35 +525,65 @@ const DMA_DB = {
   },
 
   /**
-   * Sync all user data from Cloud Firestore on login
+   * Sync all user data from Cloud Firestore on login (Parallel & Merging, never wipes local data)
    */
   async syncUserData(uid) {
     if (!db || !uid) return;
     try {
-      // 1. Sync Playbooks
-      const pbSnap = await getDocs(collection(db, 'users', uid, 'playbooks'));
-      const pbs = [];
-      pbSnap.forEach(d => pbs.push(d.data()));
-      if (pbs.length > 0) {
-        localStorage.setItem('dma_custom_playbooks', JSON.stringify(pbs));
-      } else {
-        localStorage.setItem('dma_custom_playbooks', '[]');
+      // Execute all 3 Firestore queries in parallel to speed up load time 3x
+      const [pbSnap, tradesSnap, uDoc] = await Promise.all([
+        getDocs(collection(db, 'users', uid, 'playbooks')).catch(e => { console.warn('PB fetch error', e); return { forEach: () => {} }; }),
+        getDocs(collection(db, 'users', uid, 'trades')).catch(e => { console.warn('Trades fetch error', e); return { forEach: () => {} }; }),
+        getDoc(doc(db, 'users', uid)).catch(e => { console.warn('UserDoc fetch error', e); return { exists: () => false }; })
+      ]);
+
+      // 1. Merge Playbooks (Never wipe local playbooks with empty array)
+      const cloudPbs = [];
+      pbSnap.forEach(d => cloudPbs.push(d.data()));
+
+      let localPbs = [];
+      try {
+        localPbs = JSON.parse(localStorage.getItem('dma_custom_playbooks') || '[]');
+      } catch (_) {}
+
+      if (cloudPbs.length > 0) {
+        const pbMap = new Map();
+        localPbs.forEach(p => pbMap.set(String(p.id), p));
+        cloudPbs.forEach(p => pbMap.set(String(p.id), p));
+        const mergedPbs = Array.from(pbMap.values());
+        localStorage.setItem('dma_custom_playbooks', JSON.stringify(mergedPbs));
+      } else if (localPbs.length > 0) {
+        // Cloud has 0 playbooks, sync local playbooks up to cloud
+        localPbs.forEach(p => {
+          setDoc(doc(db, 'users', uid, 'playbooks', String(p.id)), p, { merge: true }).catch(() => {});
+        });
       }
 
-      // 2. Sync Trades
-      const tradesSnap = await getDocs(collection(db, 'users', uid, 'trades'));
-      const trades = [];
-      tradesSnap.forEach(d => trades.push(d.data()));
-      if (trades.length > 0) {
-        localStorage.setItem('dma_trades', JSON.stringify(trades));
-      } else {
-        localStorage.setItem('dma_trades', '[]');
+      // 2. Merge Trades (Never wipe local trades with empty array)
+      const cloudTrades = [];
+      tradesSnap.forEach(d => cloudTrades.push(d.data()));
+
+      let localTrades = [];
+      try {
+        localTrades = JSON.parse(localStorage.getItem('dma_trades') || '[]');
+      } catch (_) {}
+
+      if (cloudTrades.length > 0) {
+        const tradeMap = new Map();
+        localTrades.forEach(t => tradeMap.set(String(t.id), t));
+        cloudTrades.forEach(t => tradeMap.set(String(t.id), t));
+        const mergedTrades = Array.from(tradeMap.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        localStorage.setItem('dma_trades', JSON.stringify(mergedTrades));
+      } else if (localTrades.length > 0) {
+        // Cloud has 0 trades, sync local trades up to cloud
+        localTrades.forEach(t => {
+          setDoc(doc(db, 'users', uid, 'trades', String(t.id)), t, { merge: true }).catch(() => {});
+        });
       }
 
       // 3. Sync Preferences (Timezone, Trading Style)
       try {
-        const uDoc = await getDoc(doc(db, 'users', uid));
-        if (uDoc.exists() && uDoc.data().preferences) {
+        if (uDoc && typeof uDoc.exists === 'function' && uDoc.exists() && uDoc.data().preferences) {
           localStorage.setItem('dma_user_preferences', JSON.stringify(uDoc.data().preferences));
         }
       } catch (_) {}

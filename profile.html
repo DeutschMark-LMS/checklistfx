@@ -13,20 +13,22 @@
   <link rel="stylesheet" href="style.css">
   <!-- Firebase Auth SDK (v12) -->
   <script type="module" src="firebaseClient.js"></script>
-  <script src="app.js" defer></script>
+  <script src="app.js?v=v2.5" defer></script>
   <script src="guardian.js" defer></script>
 </head>
 <body class="app-body profile-page">
   <header class="app-header profile-header">
-    <button class="icon-btn" aria-label="Back" data-route="app.html">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-    </button>
+    <div class="header-brand">
+      <button class="icon-btn" aria-label="Back" data-route="app.html">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+      </button>
 
-    <div class="app-logo profile-title-wrap">
-      <span class="profile-title">Profile</span>
+      <div class="app-logo profile-title-wrap">
+        <span class="profile-title">Profile</span>
+      </div>
     </div>
 
-    <div class="header-actions" style="display: flex; align-items: center; gap: 0.5rem;">
+    <div class="header-actions">
       <a href="https://wa.me/2349073113872?text=Hello%20Checklist%20Fx%20Team%2C%20I%20have%20feedback%20regarding%20the%20Beta%3A" target="_blank" rel="noopener noreferrer" class="app-header-feedback-btn" title="Send Feedback on WhatsApp">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.694.072-2.126-.521-1.614-.668-2.679-2.316-2.76-2.424-.08-.108-.65-0.865-.65-1.651 0-.786.411-1.173.557-1.332.146-.16.321-.2.428-.2.107 0 .214.001.307.006.099.005.231-.037.362.276.136.324.464 1.134.505 1.217.04.083.067.18.013.288-.054.108-.081.175-.161.27-.08.094-.17.21-.242.282-.08.08-.163.167-.07.327.094.16.417.689.896 1.116.617.549 1.137.72 1.298.8.161.08.255.07.35-.04.094-.109.404-.471.512-.633.108-.161.216-.135.362-.081.147.054.93.439 1.09.52.161.08.269.12.308.187.04.066.04.385-.104.79zM12 2C6.477 2 2 6.477 2 12c0 1.891.524 3.66 1.434 5.176L2 22l4.957-1.398A9.956 9.956 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
         <span>Feedback</span>
@@ -107,7 +109,7 @@
       <div class="setting-row compact" id="setting-row-timezone" style="cursor: pointer;" data-action="open-profile-editor">
         <div>
           <span class="setting-title">Timezone</span>
-          <small id="profile-timezone-display">America/New_York</small>
+          <small id="profile-timezone-display">Africa/Lagos (WAT, UTC+1)</small>
         </div>
         <span style="font-size: 0.75rem; color: var(--ink-muted);">Tap to Change &rsaquo;</span>
       </div>
@@ -229,13 +231,15 @@
       <div class="form-group">
         <label for="profile-timezone">Timezone</label>
         <select id="profile-timezone">
-          <option value="America/New_York">America/New_York (EST / New York)</option>
-          <option value="Europe/London">Europe/London (GMT / London)</option>
-          <option value="Europe/Frankfurt">Europe/Frankfurt (CET / Frankfurt)</option>
-          <option value="Asia/Tokyo">Asia/Tokyo (JST / Tokyo)</option>
-          <option value="Asia/Dubai">Asia/Dubai (GST / Dubai)</option>
-          <option value="Australia/Sydney">Australia/Sydney (AEST / Sydney)</option>
-          <option value="UTC">UTC (Universal Time)</option>
+          <option value="Africa/Lagos">Africa/Lagos (WAT / West Africa Time, UTC+1)</option>
+          <option value="Europe/London">Europe/London (GMT / BST / London)</option>
+          <option value="America/New_York">America/New_York (EST / EDT / New York)</option>
+          <option value="Europe/Frankfurt">Europe/Frankfurt (CET / CEST / Frankfurt)</option>
+          <option value="Asia/Dubai">Asia/Dubai (GST / Dubai, UTC+4)</option>
+          <option value="Africa/Johannesburg">Africa/Johannesburg (SAST / South Africa, UTC+2)</option>
+          <option value="Asia/Tokyo">Asia/Tokyo (JST / Tokyo, UTC+9)</option>
+          <option value="Australia/Sydney">Australia/Sydney (AEST / Sydney, UTC+10)</option>
+          <option value="UTC">UTC (Universal Time Coordinated)</option>
         </select>
       </div>
 

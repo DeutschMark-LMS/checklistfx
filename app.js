@@ -1,3 +1,46 @@
+// ==========================================================================
+// GLOBAL USER PREFERENCES & PERSISTENCE
+// ==========================================================================
+function getUserPreferences() {
+  try {
+    const raw = localStorage.getItem('dma_user_preferences');
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+
+  let detectedTz = 'Africa/Lagos';
+  try {
+    const sysTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (sysTz) detectedTz = sysTz;
+  } catch (_) {}
+
+  return {
+    name: 'Jason Trader',
+    handle: '@jasondma',
+    timezone: detectedTz,
+    style: 'Momentum + Breakout',
+    notifications: true,
+    darkMode: true,
+    riskReminders: true
+  };
+}
+window.getUserPreferences = getUserPreferences;
+
+function saveUserPreferences(prefs) {
+  try {
+    const current = getUserPreferences();
+    const updated = { ...current, ...prefs };
+    localStorage.setItem('dma_user_preferences', JSON.stringify(updated));
+    if (window.DMA_DB && typeof window.DMA_DB.savePreferences === 'function') {
+      window.DMA_DB.savePreferences(updated);
+    }
+    window.dispatchEvent(new CustomEvent('dma-preferences-updated', { detail: updated }));
+    return updated;
+  } catch (err) {
+    console.warn('Failed to save preferences:', err);
+  }
+}
+window.saveUserPreferences = saveUserPreferences;
+
 document.addEventListener('DOMContentLoaded', () => {
   // Ensure legacy sample data preference is pruned for a completely clean slate
   try {
@@ -51,36 +94,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================================================
   // PROFILE & USER CONTEXT ENGINE (WITH PERSISTENT PREFERENCES & STATS)
   // ==========================================================================
-  function getUserPreferences() {
-    try {
-      const raw = localStorage.getItem('dma_user_preferences');
-      if (raw) return JSON.parse(raw);
-    } catch (_) {}
-    return {
-      name: 'Jason Trader',
-      handle: '@jasondma',
-      timezone: 'America/New_York',
-      style: 'Momentum + Breakout',
-      notifications: true,
-      darkMode: true,
-      riskReminders: true
-    };
-  }
-
-  function saveUserPreferences(prefs) {
-    try {
-      const current = getUserPreferences();
-      const updated = { ...current, ...prefs };
-      localStorage.setItem('dma_user_preferences', JSON.stringify(updated));
-      if (window.DMA_DB && typeof window.DMA_DB.savePreferences === 'function') {
-        window.DMA_DB.savePreferences(updated);
-      }
-      window.dispatchEvent(new CustomEvent('dma-preferences-updated', { detail: updated }));
-      return updated;
-    } catch (err) {
-      console.warn('Failed to save preferences:', err);
-    }
-  }
 
   // Calculate and sync dynamic profile statistics from real trades
   function syncProfileStats() {
@@ -182,7 +195,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (inputName) inputName.value = name;
     if (inputHandle) inputHandle.value = handle;
-    if (selectTimezone) selectTimezone.value = timezone;
+    if (selectTimezone) {
+      let found = false;
+      for (let i = 0; i < selectTimezone.options.length; i++) {
+        if (selectTimezone.options[i].value === timezone) {
+          found = true;
+          break;
+        }
+      }
+      if (!found && timezone) {
+        const opt = document.createElement('option');
+        opt.value = timezone;
+        opt.textContent = `${timezone} (Local)`;
+        selectTimezone.appendChild(opt);
+      }
+      selectTimezone.value = timezone;
+    }
     if (selectStyle) selectStyle.value = style;
 
     // Sync toggles
@@ -250,7 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const nextName = document.getElementById('profile-name')?.value.trim() || 'Jason Trader';
       const rawHandle = document.getElementById('profile-handle')?.value.trim() || '@jasondma';
       const nextHandle = rawHandle.startsWith('@') ? rawHandle : '@' + rawHandle;
-      const nextTimezone = document.getElementById('profile-timezone')?.value || 'America/New_York';
+      const nextTimezone = document.getElementById('profile-timezone')?.value || 'Africa/Lagos';
       const nextStyle = document.getElementById('profile-style')?.value || 'Momentum + Breakout';
 
       saveUserPreferences({
@@ -440,6 +468,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const journalList = document.getElementById('journal-trade-list');
     if (!journalList) return;
 
+    // Filter State
+    let activeTab = 'all'; // 'all' | 'followed' | 'broken'
+    let activeDateFilter = 'all'; // 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom'
+    let activeCalFilteredDate = null; // YYYY-MM-DD when clicked in calendar
+    let searchQuery = '';
+    let advFilters = {
+      asset: 'all',
+      direction: 'all',
+      setup: 'all',
+      date: 'all',
+      customFrom: null,
+      customTo: null
+    };
+
     // 1. Render custom trades from localStorage
     function buildTradeCard(t, dateAttr) {
       const card = document.createElement('div');
@@ -451,7 +493,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const rMult = t.rMultiple || (isWin ? '+2.2R' : '-1.0R');
       const strategyTitle = t.strategy || (t.strategyKey === 'trend' ? 'Trend Continuation' : (t.strategyKey === 'impulse' ? 'Impulse Entry' : 'A+ Reversal'));
 
-      const userTz = getUserPreferences().timezone;
+      const userTz = (typeof getUserPreferences === 'function' ? getUserPreferences().timezone : 'Africa/Lagos');
       let displayTime = t.date || 'Today';
       if (t.timestamp) {
         try {
@@ -472,10 +514,36 @@ document.addEventListener('DOMContentLoaded', () => {
       card.setAttribute('data-compliance', t.isCompliant ? 'true' : 'false');
       card.setAttribute('data-confluences-met', t.confluencesMet || (t.isCompliant ? 4 : 1));
       card.setAttribute('data-confluences-total', t.totalConfluences || 4);
+
+      // Debrief & Retrospective info
+      let debrief = t.debrief || null;
+      if (!debrief) {
+        try {
+          const storedDebriefs = JSON.parse(localStorage.getItem('dma_trade_debriefs') || '{}');
+          debrief = storedDebriefs[t.id] || null;
+        } catch (_) {}
+      }
+      if (!debrief) {
+        debrief = {
+          grade: t.isCompliant ? 'A+' : 'F',
+          title: t.isCompliant ? 'Flawless Discipline' : 'Rule Breach',
+          emotion: t.isCompliant ? 'Calm & Patient' : (t.breachReason || 'FOMO'),
+          exitQuality: 'Target Hit',
+          lessons: t.notes || ''
+        };
+      }
+      card.setAttribute('data-debrief', JSON.stringify(debrief));
+
+      const gradeLetter = (debrief.grade || 'A').charAt(0).toLowerCase();
+      const gradeBadgeHtml = `<span class="trade-debrief-badge grade-${gradeLetter}">${debrief.grade}</span>`;
       
-      const tags = t.isCompliant 
-        ? ['Rules Followed', 'Disciplined', 'Playbook'] 
-        : ['Rules Broken', t.breachReason || 'FOMO', 'Impulse'];
+      const tags = [
+        debrief.emotion || (t.isCompliant ? 'Calm & Patient' : 'FOMO'),
+        t.isCompliant ? 'Rules Followed' : (t.breachReason || 'Rules Broken')
+      ];
+      if (debrief.exitQuality && debrief.exitQuality !== 'Target Hit') {
+        tags.push(debrief.exitQuality);
+      }
       card.setAttribute('data-tags', JSON.stringify(tags));
 
       const defaultConfluences = t.isCompliant 
@@ -500,11 +568,15 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       ` : '';
 
+      const lessonsText = debrief.lessons || (t.retrospective || (t.notes && !t.notes.includes('100% adherence') && !t.notes.includes('Rule breach') ? t.notes : ''));
+      const retrospectiveHtml = lessonsText ? `<div class="trade-retrospective-snippet">"${lessonsText}"</div>` : '';
+
       card.innerHTML = `
         <div class="trade-header">
           <div class="trade-asset">
             <span class="direction ${(t.direction || 'long').toLowerCase()}">${(t.direction || 'long').toUpperCase()}</span>
             <span class="ticker">${t.asset || 'XAUUSD'}</span>
+            ${gradeBadgeHtml}
           </div>
           <div class="trade-pnl ${isWin ? 'win' : 'loss'}">${pnlFormatted}</div>
         </div>
@@ -515,6 +587,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="trade-tags">
           ${tagBadgesHtml}
         </div>
+        ${retrospectiveHtml}
         <div class="trade-footer">
           <span class="discipline-badge ${t.isCompliant ? 'green' : 'red'}">
             ${t.isCompliant ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Rules Followed' : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Rules Broken'}
@@ -526,80 +599,87 @@ document.addEventListener('DOMContentLoaded', () => {
       return card;
     }
 
-    try {
-      const customTrades = JSON.parse(localStorage.getItem('dma_trades') || '[]');
-      if (customTrades.length > 0) {
+    function renderAllJournalTrades() {
+      try {
+        const customTrades = JSON.parse(localStorage.getItem('dma_trades') || '[]');
         journalList.innerHTML = '';
-        const groups = {};
-        const groupOrder = [];
+        if (customTrades.length > 0) {
+          const groups = {};
+          const groupOrder = [];
 
-        const sortedTrades = [...customTrades].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-        const now = new Date();
-        const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-        const yDate = new Date(now.getTime() - 86400000);
-        const yestKey = `${yDate.getFullYear()}-${String(yDate.getMonth() + 1).padStart(2, '0')}-${String(yDate.getDate()).padStart(2, '0')}`;
+          const sortedTrades = [...customTrades].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+          const now = new Date();
+          const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+          const yDate = new Date(now.getTime() - 86400000);
+          const yestKey = `${yDate.getFullYear()}-${String(yDate.getMonth() + 1).padStart(2, '0')}-${String(yDate.getDate()).padStart(2, '0')}`;
 
-        sortedTrades.forEach(t => {
-          let dKey = todayKey;
-          if (t.timestamp) {
-            const d = new Date(t.timestamp);
-            dKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-          }
-          if (!groups[dKey]) {
-            groups[dKey] = [];
-            groupOrder.push(dKey);
-          }
-          groups[dKey].push(t);
-        });
-
-        groupOrder.forEach(dKey => {
-          let label = dKey;
-          if (dKey === todayKey) label = 'Today';
-          else if (dKey === yestKey) label = 'Yesterday';
-          else {
-            const parts = dKey.split('-');
-            const dObj = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-            label = dObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
-          }
-
-          const header = document.createElement('div');
-          header.className = 'date-group-header';
-          header.innerHTML = `<span>${label}</span><span class="date-group-stat"></span>`;
-          journalList.appendChild(header);
-
-          groups[dKey].forEach(t => {
-            const dateAttr = dKey === todayKey ? 'today' : (dKey === yestKey ? 'yesterday' : 'past');
-            const card = buildTradeCard(t, dateAttr);
-            journalList.appendChild(card);
+          sortedTrades.forEach(t => {
+            let dKey = todayKey;
+            if (t.timestamp) {
+              const d = new Date(t.timestamp);
+              dKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            }
+            if (!groups[dKey]) {
+              groups[dKey] = [];
+              groupOrder.push(dKey);
+            }
+            groups[dKey].push(t);
           });
-        });
-      }
-    } catch (err) {
-      console.warn('Could not load custom trades into journal', err);
-    }
 
-    // Attach saved debrief badges to all trade cards
-    try {
-      const storedDebriefs = JSON.parse(localStorage.getItem('dma_trade_debriefs') || '{}');
-      journalList.querySelectorAll('.trade-card').forEach(card => {
-        const tid = card.getAttribute('data-trade-id');
-        if (tid && storedDebriefs[tid]) {
-          const deb = storedDebriefs[tid];
-          card.setAttribute('data-debrief', JSON.stringify(deb));
-          let b = card.querySelector('.trade-debrief-badge');
-          const gradeLetter = (deb.grade || 'A').charAt(0).toLowerCase();
-          if (!b) {
-            b = document.createElement('span');
-            b.className = `trade-debrief-badge grade-${gradeLetter}`;
-            const footerEl = card.querySelector('.trade-footer');
-            if (footerEl) footerEl.appendChild(b);
-          } else {
-            b.className = `trade-debrief-badge grade-${gradeLetter}`;
-          }
-          b.textContent = `Grade: ${deb.grade}`;
+          groupOrder.forEach(dKey => {
+            let label = dKey;
+            if (dKey === todayKey) label = 'Today';
+            else if (dKey === yestKey) label = 'Yesterday';
+            else {
+              const parts = dKey.split('-');
+              const dObj = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+              label = dObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+            }
+
+            const header = document.createElement('div');
+            header.className = 'date-group-header';
+            header.innerHTML = `<span>${label}</span><span class="date-group-stat"></span>`;
+            journalList.appendChild(header);
+
+            groups[dKey].forEach(t => {
+              const dateAttr = dKey === todayKey ? 'today' : (dKey === yestKey ? 'yesterday' : 'past');
+              const card = buildTradeCard(t, dateAttr);
+              journalList.appendChild(card);
+            });
+          });
         }
-      });
-    } catch (_) {}
+      } catch (err) {
+        console.warn('Could not load custom trades into journal', err);
+      }
+
+      // Attach saved debrief badges to all trade cards
+      try {
+        const storedDebriefs = JSON.parse(localStorage.getItem('dma_trade_debriefs') || '{}');
+        journalList.querySelectorAll('.trade-card').forEach(card => {
+          const tid = card.getAttribute('data-trade-id');
+          if (tid && storedDebriefs[tid]) {
+            const deb = storedDebriefs[tid];
+            card.setAttribute('data-debrief', JSON.stringify(deb));
+            let b = card.querySelector('.trade-debrief-badge');
+            const gradeLetter = (deb.grade || 'A').charAt(0).toLowerCase();
+            if (!b) {
+              b = document.createElement('span');
+              b.className = `trade-debrief-badge grade-${gradeLetter}`;
+              const footerEl = card.querySelector('.trade-footer');
+              if (footerEl) footerEl.appendChild(b);
+            } else {
+              b.className = `trade-debrief-badge grade-${gradeLetter}`;
+            }
+            b.textContent = `Grade: ${deb.grade}`;
+          }
+        });
+      } catch (_) {}
+
+      applyAllJournalFilters();
+      if (typeof renderCalendarHeatmap === 'function') {
+        renderCalendarHeatmap();
+      }
+    }
 
     // Helper: Normalize trade card date to YYYY-MM-DD
     function getTradeDateKey(card) {
@@ -616,20 +696,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     }
-
-    // 2. Filter State
-    let activeTab = 'all'; // 'all' | 'followed' | 'broken'
-    let activeDateFilter = 'all'; // 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom'
-    let activeCalFilteredDate = null; // YYYY-MM-DD when clicked in calendar
-    let searchQuery = '';
-    let advFilters = {
-      asset: 'all',
-      direction: 'all',
-      setup: 'all',
-      date: 'all',
-      customFrom: null,
-      customTo: null
-    };
 
     function matchDate(card, filterType, customFrom, customTo) {
       if (filterType === 'all') return true;
@@ -753,6 +819,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const netPnlEl = document.getElementById('journal-net-pnl');
       const tradesCountEl = document.getElementById('journal-trades-count');
+      const winRateEl = document.getElementById('journal-win-rate');
+      const winLossCountEl = document.getElementById('journal-win-loss-count');
       const disciplineEl = document.getElementById('journal-discipline-rate');
       const fomoTaxEl = document.getElementById('journal-fomo-tax');
 
@@ -769,7 +837,22 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (tradesCountEl) {
-        tradesCountEl.textContent = visibleCount === 0 ? '0 Trades' : `${visibleCount} Trades (${winCount}W · ${lossCount}L)`;
+        tradesCountEl.textContent = visibleCount === 1 ? '1 Trade Logged' : `${visibleCount} Trades Logged`;
+      }
+
+      if (winRateEl) {
+        if (visibleCount === 0) {
+          winRateEl.textContent = '--%';
+          winRateEl.className = 'digest-val';
+        } else {
+          const wr = Math.round((winCount / visibleCount) * 100);
+          winRateEl.textContent = `${wr}%`;
+          winRateEl.className = `digest-val ${wr >= 50 ? 'cyan' : 'red'}`;
+        }
+      }
+
+      if (winLossCountEl) {
+        winLossCountEl.textContent = `${winCount}W · ${lossCount}L`;
       }
 
       if (disciplineEl) {
@@ -842,12 +925,16 @@ document.addEventListener('DOMContentLoaded', () => {
           journalList.appendChild(emptyState);
           document.getElementById('empty-reset-filters-btn')?.addEventListener('click', resetAllFilters);
           document.getElementById('empty-log-trade-btn')?.addEventListener('click', () => {
-            const modal = document.getElementById('trade-logger-modal');
-            const backdrop = document.getElementById('trade-logger-backdrop');
-            if (modal && backdrop) {
-              modal.style.display = 'block';
-              backdrop.style.display = 'block';
-              document.body.classList.add('modal-open');
+            if (typeof openLogTradeModal === 'function') {
+              openLogTradeModal();
+            } else {
+              const modal = document.getElementById('log-trade-modal');
+              const backdrop = document.getElementById('log-trade-backdrop');
+              if (modal && backdrop) {
+                modal.classList.add('open');
+                backdrop.classList.add('open');
+                document.body.style.overflow = 'hidden';
+              }
             }
           });
         }
@@ -1621,9 +1708,9 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // Initial pass
-    applyAllJournalFilters();
-    renderCalendarHeatmap();
+    // Initial pass & Global Hook
+    window.refreshJournal = renderAllJournalTrades;
+    renderAllJournalTrades();
   }
 
   // Ensure init runs
@@ -1632,6 +1719,14 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     initJournalModule();
   }
+  window.addEventListener('dma-data-synced', () => {
+    if (typeof window.refreshJournal === 'function') window.refreshJournal();
+  });
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'dma_trades' && typeof window.refreshJournal === 'function') {
+      window.refreshJournal();
+    }
+  });
 
 
   // Tooltip Logic for Analytics Heatmap
@@ -1907,11 +2002,79 @@ document.addEventListener('DOMContentLoaded', () => {
         leak: b.m3.count > 0 ? `-$${Math.round(Math.abs(b.m3.cost) / (b.m3.count || 1))} / breach` : '$0.00 / breach',
         cost: b.m3.count > 0 ? fmt(b.m3.cost) : '$0.00'
       },
-      edges: b.edges.map(e => ({
-        name: e.name,
-        bar: totalTrades === 0 ? '0%' : `${e.val}%`,
-        val: totalTrades === 0 ? '--%' : `${e.val}%`
-      }))
+      edges: (() => {
+        let followedWins = 0;
+        let followedCount = 0;
+        let brokenWins = 0;
+        let brokenCount = 0;
+        const stratMap = {};
+        const assetMap = {};
+
+        customTrades.forEach(t => {
+          const isWin = (Number(t.pnl) > 0) || t.outcome === 'win';
+          if (t.isCompliant) {
+            followedCount++;
+            if (isWin) followedWins++;
+          } else {
+            brokenCount++;
+            if (isWin) brokenWins++;
+          }
+
+          const sName = t.strategy || t.strategyKey || 'Playbook Setup';
+          if (!stratMap[sName]) stratMap[sName] = { total: 0, wins: 0 };
+          stratMap[sName].total++;
+          if (isWin) stratMap[sName].wins++;
+
+          const aName = (t.asset || 'XAUUSD').toUpperCase();
+          if (!assetMap[aName]) assetMap[aName] = { total: 0, wins: 0 };
+          assetMap[aName].total++;
+          if (isWin) assetMap[aName].wins++;
+        });
+
+        const fWr = followedCount > 0 ? Math.round((followedWins / followedCount) * 100) : 0;
+        const bWr = brokenCount > 0 ? Math.round((brokenWins / brokenCount) * 100) : 0;
+
+        let bestStrat = { name: 'Top Setup Strategy', wr: 0, count: 0 };
+        Object.keys(stratMap).forEach(k => {
+          const item = stratMap[k];
+          const wr = Math.round((item.wins / item.total) * 100);
+          if (wr >= bestStrat.wr) {
+            bestStrat = { name: k, wr, count: item.total };
+          }
+        });
+
+        let bestAsset = { name: 'Primary Asset', wr: 0, count: 0 };
+        Object.keys(assetMap).forEach(k => {
+          const item = assetMap[k];
+          const wr = Math.round((item.wins / item.total) * 100);
+          if (wr >= bestAsset.wr) {
+            bestAsset = { name: k, wr, count: item.total };
+          }
+        });
+
+        return [
+          {
+            name: followedCount > 0 ? `Rules Followed (${followedCount} Trades)` : 'Rules Followed Setup',
+            val: followedCount > 0 ? `${fWr}%` : '--%',
+            bar: followedCount > 0 ? `${fWr}%` : '0%'
+          },
+          {
+            name: bestStrat.count > 0 ? `${bestStrat.name} (${bestStrat.count} Trades)` : 'Top Setup Strategy',
+            val: bestStrat.count > 0 ? `${bestStrat.wr}%` : '--%',
+            bar: bestStrat.count > 0 ? `${bestStrat.wr}%` : '0%'
+          },
+          {
+            name: bestAsset.count > 0 ? `${bestAsset.name} (${bestAsset.count} Trades)` : 'Primary Asset',
+            val: bestAsset.count > 0 ? `${bestAsset.wr}%` : '--%',
+            bar: bestAsset.count > 0 ? `${bestAsset.wr}%` : '0%'
+          },
+          {
+            name: brokenCount > 0 ? `Rules Broken (${brokenCount} Breaches)` : 'Rules Broken (FOMO Penalty)',
+            val: brokenCount > 0 ? `${bWr}%` : '--%',
+            bar: brokenCount > 0 ? `${bWr}%` : '0%'
+          }
+        ];
+      })()
     };
   }
 
@@ -2227,6 +2390,13 @@ let activeDirection = 'long';
 let activeOutcome = 'win';
 let isConfluencesVerified = false;
 
+// Post-Trade Debrief state in Log Trade Modal
+let activeLogGrade = 'A+';
+let activeLogGradeTitle = 'Flawless Discipline';
+let activeLogEmotion = 'Calm & Patient';
+let activeLogExit = 'Target Hit';
+let isLogGradeManuallySet = false;
+
 function updateModalStrategyHeader(strategyKey) {
   const strat = tradeStrategies[strategyKey] || tradeStrategies.reversal;
   const pb = typeof playbookRegistry !== 'undefined' ? playbookRegistry[strategyKey] : null;
@@ -2259,6 +2429,25 @@ function openLogTradeModal() {
 
   updateModalStrategyHeader(activeStrategyKey);
   renderConfluenceChecklist(activeStrategyKey);
+
+  // Reset Debrief & Retrospective inputs for calm post-trade reflection
+  isLogGradeManuallySet = false;
+  activeLogGrade = 'A+';
+  activeLogGradeTitle = 'Flawless Discipline';
+  activeLogEmotion = 'Calm & Patient';
+  activeLogExit = 'Target Hit';
+
+  document.querySelectorAll('#log-debrief-grades-picker .debrief-grade-btn').forEach((b, idx) => {
+    b.classList.toggle('active', idx === 0);
+  });
+  document.querySelectorAll('#log-debrief-emotion-picker .debrief-pill').forEach((p, idx) => {
+    p.classList.toggle('active', idx === 0);
+  });
+  document.querySelectorAll('#log-debrief-exit-picker .debrief-pill').forEach((p, idx) => {
+    p.classList.toggle('active', idx === 0);
+  });
+  const lessonsInput = document.getElementById('log-debrief-lessons-input');
+  if (lessonsInput) lessonsInput.value = '';
 }
 
 function closeLogTradeModal() {
@@ -2481,6 +2670,15 @@ function performConfluenceVerification() {
     }
   }
 
+  // Auto-sync debrief execution grade based on plan compliance unless user manually chose a grade
+  if (!isLogGradeManuallySet) {
+    activeLogGrade = isFullCompliance ? 'A+' : 'F';
+    activeLogGradeTitle = isFullCompliance ? 'Flawless Discipline' : 'Rule Breach';
+    document.querySelectorAll('#log-debrief-grades-picker .debrief-grade-btn').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-grade') === activeLogGrade);
+    });
+  }
+
   return isFullCompliance;
 }
 
@@ -2489,6 +2687,13 @@ const closeLogTradeBtn = document.getElementById('close-log-trade-btn');
 const logTradeBackdrop = document.getElementById('log-trade-backdrop');
 if (closeLogTradeBtn) closeLogTradeBtn.addEventListener('click', closeLogTradeModal);
 if (logTradeBackdrop) logTradeBackdrop.addEventListener('click', closeLogTradeModal);
+
+const journalLogBtn = document.getElementById('journal-log-trade-header-btn');
+if (journalLogBtn) {
+  journalLogBtn.addEventListener('click', () => {
+    if (typeof openLogTradeModal === 'function') openLogTradeModal();
+  });
+}
 
 // Verify confluences button listener
 const btnVerifyConfluences = document.getElementById('btn-verify-confluences');
@@ -2587,6 +2792,39 @@ if (pasteTvBtn && tvScreenshotInput) {
   });
 }
 
+// Debrief & Retrospective Controls in Log Trade Modal
+function initLogTradeDebriefControls() {
+  const gradeBtns = document.querySelectorAll('#log-debrief-grades-picker .debrief-grade-btn');
+  gradeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      gradeBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeLogGrade = btn.getAttribute('data-grade') || 'A+';
+      activeLogGradeTitle = btn.getAttribute('data-title') || 'Execution Grade';
+      isLogGradeManuallySet = true;
+    });
+  });
+
+  const emotionPills = document.querySelectorAll('#log-debrief-emotion-picker .debrief-pill');
+  emotionPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      emotionPills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      activeLogEmotion = pill.getAttribute('data-emotion') || 'Calm & Patient';
+    });
+  });
+
+  const exitPills = document.querySelectorAll('#log-debrief-exit-picker .debrief-pill');
+  exitPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      exitPills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      activeLogExit = pill.getAttribute('data-exit') || 'Target Hit';
+    });
+  });
+}
+initLogTradeDebriefControls();
+
 // Form submission & Live Dashboard updates
 const logTradeForm = document.getElementById('log-trade-form');
 if (logTradeForm) {
@@ -2626,6 +2864,16 @@ if (logTradeForm) {
       }
     });
 
+    const debriefLessons = document.getElementById('log-debrief-lessons-input')?.value?.trim() || '';
+
+    const debriefData = {
+      grade: activeLogGrade || (isCompliant ? 'A+' : 'F'),
+      title: activeLogGradeTitle || (isCompliant ? 'Flawless Discipline' : 'Rule Breach Detected'),
+      emotion: activeLogEmotion || 'Calm & Patient',
+      exitQuality: activeLogExit || 'Target Hit Exactly',
+      lessons: debriefLessons
+    };
+
     // Create trade object
     const newTrade = {
       id: Date.now(),
@@ -2644,11 +2892,12 @@ if (logTradeForm) {
       isCompliant,
       breachReason,
       screenshotUrl,
-      notes: isCompliant ? 'Executed with 100% adherence to playbook confluences.' : `Rule breach detected: ${breachReason || 'Confluences missed'}`,
+      debrief: debriefData,
+      retrospective: debriefLessons,
+      notes: debriefLessons || (isCompliant ? 'Executed with 100% adherence to playbook confluences.' : `Rule breach detected: ${breachReason || 'Confluences missed'}`),
       date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: getUserPreferences().timezone }),
       timestamp: Date.now()
     };
-
 
     // Store in localStorage for Journal
     try {
@@ -2658,6 +2907,13 @@ if (logTradeForm) {
     } catch (err) {
       console.warn('Storage error', err);
     }
+
+    // Persist Debrief lookup in dma_trade_debriefs for instant Inspector access
+    try {
+      const storedDebriefs = JSON.parse(localStorage.getItem('dma_trade_debriefs') || '{}');
+      storedDebriefs[newTrade.id] = debriefData;
+      localStorage.setItem('dma_trade_debriefs', JSON.stringify(storedDebriefs));
+    } catch (_) {}
 
     // Persist to Firebase Firestore Backend
     if (window.DMA_DB && typeof window.DMA_DB.saveTrade === 'function') {
@@ -2670,14 +2926,22 @@ if (logTradeForm) {
     if (typeof window.updateDashboardMetrics === 'function') {
       window.updateDashboardMetrics();
     }
+    // Live update on journal.html if present
+    if (typeof window.refreshJournal === 'function') {
+      window.refreshJournal();
+    }
+    // Live update on playbook grid if present
+    if (typeof window.refreshPlaybookGrid === 'function') {
+      window.refreshPlaybookGrid(true);
+    }
 
     closeLogTradeModal();
 
     // Feedback Alert
     if (isCompliant) {
-      alert(`✓ TRADE COMMITTED TO LEDGER!\n\n${asset} ${direction} (${pnlFinal >= 0 ? '+$' + pnlFinal : '-$' + Math.abs(pnlFinal)})\n100% Plan Compliance (${met}/${total} Confluences Verified).\n\nDiscipline maintained.`);
+      alert(`✓ AUDITED TRADE COMMITTED TO LEDGER!\n\n${asset} ${direction} (${pnlFinal >= 0 ? '+$' + pnlFinal : '-$' + Math.abs(pnlFinal)})\nExecution Grade: ${debriefData.grade} (${debriefData.emotion})\n100% Plan Compliance (${met}/${total} Confluences Verified).\n\nCalm mind debrief locked.`);
     } else {
-      alert(`⚠ TRADE COMMITTED UNDER RULES BROKEN\n\n${asset} ${direction} (${pnlFinal >= 0 ? '+$' + pnlFinal : '-$' + Math.abs(pnlFinal)})\nMissing: ${total - met} of ${total} confluences.\n\nAdded to your FOMO Tax calculation.`);
+      alert(`⚠ AUDITED TRADE COMMITTED (RULE BREACH)\n\n${asset} ${direction} (${pnlFinal >= 0 ? '+$' + pnlFinal : '-$' + Math.abs(pnlFinal)})\nExecution Grade: ${debriefData.grade} (${debriefData.emotion})\nMissing: ${total - met} of ${total} confluences.\n\nRetrospective recorded & added to FOMO Tax.`);
     }
   });
 }
@@ -2806,6 +3070,109 @@ function getEffectivePlaybooks() {
 let lastRenderedPlaybooksHash = null;
 
 /**
+ * Computes statistical metrics for a specific playbook based on real logged user trades
+ */
+function getPlaybookRealStats(playbookId, playbookName, setupType) {
+  let trades = [];
+  try {
+    trades = JSON.parse(localStorage.getItem('dma_trades') || '[]');
+  } catch (_) {}
+
+  const pbTrades = trades.filter(t => {
+    if (!t) return false;
+    if (t.strategyKey && t.strategyKey === playbookId) return true;
+    if (t.strategy && playbookName && t.strategy.toLowerCase() === playbookName.toLowerCase()) return true;
+    if (setupType && t.strategyKey === setupType && !String(t.strategyKey).startsWith('custom_')) return true;
+    return false;
+  });
+
+  const tradesCount = pbTrades.length;
+  let wins = 0;
+  let totalPnl = 0;
+  let followedCount = 0;
+  let followedWins = 0;
+  let brokenCount = 0;
+  let brokenWins = 0;
+
+  pbTrades.forEach(t => {
+    const pnl = Number(t.pnl) || 0;
+    totalPnl += pnl;
+    const isWin = pnl > 0 || t.outcome === 'win';
+    if (isWin) wins++;
+
+    if (t.isCompliant) {
+      followedCount++;
+      if (isWin) followedWins++;
+    } else {
+      brokenCount++;
+      if (isWin) brokenWins++;
+    }
+  });
+
+  const wrNum = tradesCount > 0 ? Math.round((wins / tradesCount) * 100) : 0;
+  const wrStr = tradesCount > 0 ? `${wrNum}%` : '--%';
+  const pnlStr = tradesCount > 0 
+    ? (totalPnl >= 0 ? `+$${totalPnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `-$${Math.abs(totalPnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+    : '$0.00';
+
+  const followedWRNum = followedCount > 0 ? Math.round((followedWins / followedCount) * 100) : 0;
+  const followedWRStr = followedCount > 0 ? `${followedWRNum}%` : '--%';
+  const brokenWRNum = brokenCount > 0 ? Math.round((brokenWins / brokenCount) * 100) : 0;
+  const brokenWRStr = brokenCount > 0 ? `${brokenWRNum}%` : '--%';
+
+  let multiplier = '-- Discipline Multiplier';
+  if (brokenWRNum > 0) {
+    const mult = (followedWRNum / brokenWRNum).toFixed(1);
+    multiplier = `${mult}x Higher Win Rate`;
+  } else if (followedWRNum > 0) {
+    multiplier = `+${followedWRNum}% Followed Edge`;
+  }
+
+  let svgFollowed = '0,32 300,32';
+  let svgActual = '0,32 300,32';
+  if (tradesCount > 0) {
+    let cum = 32;
+    const pts = [`0,32`];
+    const step = Math.max(15, Math.floor(300 / Math.max(1, Math.min(10, tradesCount))));
+    pbTrades.slice(0, 10).forEach((t, i) => {
+      const p = Number(t.pnl) || 0;
+      cum = Math.max(8, Math.min(56, cum - (p >= 0 ? 6 : -6)));
+      pts.push(`${Math.min(300, (i + 1) * step)},${cum}`);
+    });
+    svgActual = pts.join(' ');
+    svgFollowed = pts.map(pt => {
+      const parts = pt.split(',');
+      return `${parts[0]},${Math.max(6, Number(parts[1]) - 6)}`;
+    }).join(' ');
+  }
+
+  return {
+    tradesCount,
+    tradesCountStr: `${tradesCount} Trade${tradesCount === 1 ? '' : 's'}`,
+    wins,
+    losses: tradesCount - wins,
+    wrNum,
+    wrStr,
+    totalPnl,
+    pnlStr,
+    followedCount,
+    followedWins,
+    followedWRNum,
+    followedWRStr,
+    brokenCount,
+    brokenWins,
+    brokenWRNum,
+    brokenWRStr,
+    followedMeta: tradesCount > 0 ? `${followedWins} Wins of ${followedCount} Trades` : 'No trades logged',
+    brokenMeta: tradesCount > 0 ? `${brokenWins} Wins of ${brokenCount} Trades` : 'No breaches logged',
+    multiplier,
+    svgFollowed,
+    svgActual
+  };
+}
+window.getPlaybookRealStats = getPlaybookRealStats;
+
+/**
  * Renders playbooks on app.html dashboard with cache guard to eliminate re-render twitch
  */
 function renderDashboardPlaybooks(force = false) {
@@ -2820,7 +3187,7 @@ function renderDashboardPlaybooks(force = false) {
     confluencesCount: p.confluences ? p.confluences.length : 0
   })));
 
-  if (!force && container.children.length > 0 && lastRenderedPlaybooksHash === currentHash) {
+  if (!force && (container.children?.length || 0) > 0 && lastRenderedPlaybooksHash === currentHash) {
     return; // Data has not changed, do NOT wipe DOM and cause layout twitch
   }
   lastRenderedPlaybooksHash = currentHash;
@@ -2841,7 +3208,7 @@ function renderDashboardPlaybooks(force = false) {
     container.appendChild(emptyBox);
 
     const createBtn = emptyBox.querySelector('#empty-create-pb-btn');
-    if (createBtn) createBtn.addEventListener('click', openChecklistCreatorModal);
+    if (createBtn) createBtn.addEventListener('click', () => openChecklistCreatorModal());
     return;
   }
 
@@ -2849,10 +3216,13 @@ function renderDashboardPlaybooks(force = false) {
     const card = document.createElement('div');
     card.className = 'checklist-card';
     card.setAttribute('data-playbook-id', pb.id);
+    const realStats = getPlaybookRealStats(pb.id, pb.name, pb.setupType);
+    const wrText = realStats.tradesCount > 0 ? `${realStats.wrStr} WR` : '--% WR';
+
     card.innerHTML = `
       <div class="card-info">
         <h4>${pb.name}</h4>
-        <span class="card-meta">${pb.confluences ? pb.confluences.length : 3} Confluences • ${pb.wr || '--% WR'}</span>
+        <span class="card-meta">${pb.confluences ? pb.confluences.length : 3} Confluences • ${wrText} • ${realStats.tradesCountStr}</span>
       </div>
       <button class="icon-btn action" aria-label="View Setup Details">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
@@ -2877,12 +3247,13 @@ function openPlaybookDetailModal(playbookId) {
   if (!pb) return;
 
   activeInspectingPlaybookId = playbookId;
+  const realStats = getPlaybookRealStats(pb.id, pb.name, pb.setupType);
 
   // Header & Title
   const title = document.getElementById('pb-detail-title');
   const wrBadge = document.getElementById('pb-detail-wr');
   if (title) title.textContent = pb.name;
-  if (wrBadge) wrBadge.textContent = `${pb.wr || '68%'} WR`;
+  if (wrBadge) wrBadge.textContent = realStats.tradesCount > 0 ? `${realStats.wrStr} WR` : '--% WR';
 
   // Visual Divergence Bars & Multipliers
   const statFollowed = document.getElementById('pb-detail-stat-followed');
@@ -2895,15 +3266,15 @@ function openPlaybookDetailModal(playbookId) {
 
   const multiplierVal = document.getElementById('pb-multiplier-val');
 
-  if (statFollowed) statFollowed.textContent = `${pb.followedWR || '75%'} WR`;
-  if (barFollowed) barFollowed.style.width = pb.followedBar || pb.followedWR || '75%';
-  if (metaFollowed) metaFollowed.textContent = pb.followedMeta || 'Strict Discipline Wins';
+  if (statFollowed) statFollowed.textContent = `${realStats.followedWRStr} WR`;
+  if (barFollowed) barFollowed.style.width = realStats.followedCount > 0 ? `${realStats.followedWRNum}%` : '50%';
+  if (metaFollowed) metaFollowed.textContent = realStats.followedMeta;
 
-  if (statBroken) statBroken.textContent = `${pb.brokenWR || '20%'} WR`;
-  if (barBroken) barBroken.style.width = pb.brokenBar || pb.brokenWR || '20%';
-  if (metaBroken) metaBroken.textContent = pb.brokenMeta || 'FOMO / Emotional Losses';
+  if (statBroken) statBroken.textContent = `${realStats.brokenWRStr} WR`;
+  if (barBroken) barBroken.style.width = realStats.brokenCount > 0 ? `${realStats.brokenWRNum}%` : '50%';
+  if (metaBroken) metaBroken.textContent = realStats.brokenMeta;
 
-  if (multiplierVal) multiplierVal.textContent = pb.multiplier || '3.5x Higher Win Rate';
+  if (multiplierVal) multiplierVal.textContent = realStats.multiplier;
 
   // Sparkline Equity & P&L
   const statPnl = document.getElementById('pb-detail-stat-pnl');
@@ -2912,21 +3283,22 @@ function openPlaybookDetailModal(playbookId) {
   const svgFollowed = document.getElementById('pb-svg-followed');
   const svgActual = document.getElementById('pb-svg-actual');
 
-  if (statPnl) statPnl.textContent = `${pb.pnl || '+$1,500'} Net`;
-  if (potentialPnl) potentialPnl.textContent = pb.potentialPnl || '+$2,400';
-  if (actualPnl) actualPnl.textContent = pb.actualPnl || pb.pnl || '+$1,500';
+  if (statPnl) statPnl.textContent = `${realStats.pnlStr} Net`;
+  if (potentialPnl) potentialPnl.textContent = realStats.pnlStr;
+  if (actualPnl) actualPnl.textContent = realStats.pnlStr;
 
-  if (svgFollowed && pb.svgFollowed) svgFollowed.setAttribute('points', pb.svgFollowed);
-  if (svgActual && pb.svgActual) svgActual.setAttribute('points', pb.svgActual);
+  if (svgFollowed) svgFollowed.setAttribute('points', realStats.svgFollowed);
+  if (svgActual) svgActual.setAttribute('points', realStats.svgActual);
 
   // Required Confluences List
   const confCount = document.getElementById('pb-detail-conf-count');
   const rulesList = document.getElementById('pb-detail-rules-list');
-  if (confCount) confCount.textContent = `${pb.confluences.length} Required`;
+  const confluences = pb.confluences || [];
+  if (confCount) confCount.textContent = `${confluences.length} Required`;
 
   if (rulesList) {
     rulesList.innerHTML = '';
-    pb.confluences.forEach((rule, idx) => {
+    confluences.forEach((rule, idx) => {
       const item = document.createElement('div');
       item.className = 'pb-rule-item';
       item.innerHTML = `
@@ -2971,7 +3343,6 @@ if (pbActionLogBtn) {
   pbActionLogBtn.addEventListener('click', () => {
     closePlaybookDetailModal();
 
-    // Select this strategy in Log Trade Modal
     if (tradeStrategies[activeInspectingPlaybookId]) {
       activeStrategyKey = activeInspectingPlaybookId;
       const stratPills = document.querySelectorAll('#log-strategy-group .strategy-pill');
@@ -2985,6 +3356,16 @@ if (pbActionLogBtn) {
     }
 
     openLogTradeModal();
+  });
+}
+
+// Edit Playbook action in detail modal
+const pbEditBtn = document.getElementById('pb-edit-btn');
+if (pbEditBtn) {
+  pbEditBtn.addEventListener('click', () => {
+    const targetId = activeInspectingPlaybookId;
+    closePlaybookDetailModal();
+    openChecklistCreatorModal(targetId);
   });
 }
 
@@ -3002,53 +3383,47 @@ if (pbDeleteBtn) {
       return;
     }
 
-    // 1. Remove Card from Dashboard & Playbook Grid
-    const card = document.querySelector(`.checklist-card[data-playbook-id="${targetId}"]`);
-    if (card) card.remove();
-    const pbCard = document.querySelector(`.playbook-card[data-playbook-id="${targetId}"]`);
-    if (pbCard) pbCard.remove();
-    if (typeof window.refreshPlaybookGrid === 'function') {
-      window.refreshPlaybookGrid();
-    }
-
-
-    // 2. Remove from Log Strategy Dropdown & Pills
-    const opt = document.querySelector(`#log-strategy-select option[value="${targetId}"]`);
-    if (opt) opt.remove();
-
-    const pill = document.querySelector(`#log-strategy-group .strategy-pill[data-strategy="${targetId}"]`);
-    if (pill) pill.remove();
-
-    // 3. Remove from in-memory objects
+    // 1. Delete from in-memory objects immediately
     delete playbookRegistry[targetId];
     delete tradeStrategies[targetId];
 
-    // 4. Update localStorage
+    // 2. Update localStorage immediately
     try {
-      // Remove from custom playbooks if present
       const customSaved = JSON.parse(localStorage.getItem('dma_custom_playbooks') || '[]');
       const filtered = customSaved.filter(item => item.id !== targetId);
       localStorage.setItem('dma_custom_playbooks', JSON.stringify(filtered));
 
-      // Persist deletion for built-in playbooks too
       const deletedIds = JSON.parse(localStorage.getItem('dma_deleted_playbooks') || '[]');
       if (!deletedIds.includes(targetId)) {
         deletedIds.push(targetId);
         localStorage.setItem('dma_deleted_playbooks', JSON.stringify(deletedIds));
       }
+
       // Delete from Cloud Firestore backend
       if (window.DMA_DB && typeof window.DMA_DB.deletePlaybook === 'function') {
         window.DMA_DB.deletePlaybook(targetId);
-      }
-      if (typeof window.renderDashboardPlaybooks === 'function') {
-        window.renderDashboardPlaybooks();
       }
     } catch (err) {
       console.warn('Storage error during playbook delete:', err);
     }
 
-    // 5. Close inspector modal
+    // 3. Close inspector modal immediately
     closePlaybookDetailModal();
+
+    // 4. Force re-render grids immediately so card vanishes without reload
+    if (typeof window.renderDashboardPlaybooks === 'function') {
+      window.renderDashboardPlaybooks(true);
+    }
+    if (typeof window.refreshPlaybookGrid === 'function') {
+      window.refreshPlaybookGrid(true);
+    }
+
+    // 5. Remove from Log Strategy Dropdown & Pills
+    const opt = document.querySelector(`#log-strategy-select option[value="${targetId}"]`);
+    if (opt) opt.remove();
+
+    const pill = document.querySelector(`#log-strategy-group .strategy-pill[data-strategy="${targetId}"]`);
+    if (pill) pill.remove();
   });
 }
 
@@ -3058,12 +3433,70 @@ if (closePlaybookDetailBtn) closePlaybookDetailBtn.addEventListener('click', clo
 if (playbookDetailBackdrop) playbookDetailBackdrop.addEventListener('click', closePlaybookDetailModal);
 
 // ==========================================================================
-// CHECKLIST CREATOR MODAL
+// CHECKLIST CREATOR & EDITOR MODAL
 // ==========================================================================
-function openChecklistCreatorModal() {
+let currentEditingPlaybookId = null;
+
+function openChecklistCreatorModal(editPlaybookId = null) {
   const modal = document.getElementById('checklist-creator-modal');
   const backdrop = document.getElementById('checklist-creator-backdrop');
   if (!modal || !backdrop) return;
+
+  const modalTitle = document.getElementById('creator-modal-title');
+  const modalBadge = document.getElementById('creator-modal-badge');
+  const submitBtn = document.getElementById('creator-submit-btn') || modal.querySelector('button[type="submit"]');
+  const nameInput = document.getElementById('creator-setup-name');
+  const rrInput = document.getElementById('creator-target-rr');
+  const typePills = document.querySelectorAll('#creator-type-group .pill, #creator-type-pills .pill');
+
+  if (typeof editPlaybookId === 'string' && playbookRegistry[editPlaybookId]) {
+    currentEditingPlaybookId = editPlaybookId;
+    const pb = playbookRegistry[editPlaybookId];
+
+    if (modalTitle) modalTitle.textContent = 'EDIT PLAYBOOK MODEL';
+    if (modalBadge) {
+      modalBadge.textContent = 'EDITING';
+      modalBadge.className = 'live-compliance-badge';
+    }
+    if (submitBtn) submitBtn.textContent = 'UPDATE PLAYBOOK';
+
+    if (nameInput) nameInput.value = pb.name || '';
+    if (rrInput) rrInput.value = pb.targetRr || '1:2.5';
+
+    const currentType = (pb.setupType || 'reversal').toLowerCase();
+    typePills.forEach(p => {
+      const pType = (p.getAttribute('data-type') || '').toLowerCase();
+      p.classList.toggle('active', pType === currentType);
+    });
+
+    if (creatorRulesContainer) {
+      creatorRulesContainer.innerHTML = '';
+      const confluences = pb.confluences && pb.confluences.length > 0 ? pb.confluences : [''];
+      confluences.forEach(rule => appendRuleRow(rule));
+    }
+  } else {
+    currentEditingPlaybookId = null;
+    if (modalTitle) modalTitle.textContent = 'NEW PLAYBOOK MODEL';
+    if (modalBadge) {
+      modalBadge.textContent = 'BUILDER';
+      modalBadge.className = 'live-compliance-badge verified';
+    }
+    if (submitBtn) submitBtn.textContent = 'SAVE PLAYBOOK';
+
+    if (nameInput) nameInput.value = '';
+    if (rrInput) rrInput.value = '1:2.5';
+
+    typePills.forEach((p, idx) => {
+      p.classList.toggle('active', idx === 0);
+    });
+
+    if (creatorRulesContainer) {
+      creatorRulesContainer.innerHTML = '';
+      appendRuleRow('', 'e.g. 4H Key Level or Liquidity Pool swept');
+      appendRuleRow('', 'e.g. 15M Market Structure Shift with displacement');
+      appendRuleRow('', 'e.g. Strict 1:2.5 minimum Risk-to-Reward profile');
+    }
+  }
 
   modal.classList.add('open');
   modal.setAttribute('aria-hidden', 'false');
@@ -3072,6 +3505,7 @@ function openChecklistCreatorModal() {
 }
 
 function closeChecklistCreatorModal() {
+  currentEditingPlaybookId = null;
   const modal = document.getElementById('checklist-creator-modal');
   const backdrop = document.getElementById('checklist-creator-backdrop');
   if (!modal || !backdrop) return;
@@ -3088,7 +3522,7 @@ const headerAddChecklistBtn = document.getElementById('header-add-checklist-btn'
 
 if (closeCreatorBtn) closeCreatorBtn.addEventListener('click', closeChecklistCreatorModal);
 if (checklistCreatorBackdrop) checklistCreatorBackdrop.addEventListener('click', closeChecklistCreatorModal);
-if (headerAddChecklistBtn) headerAddChecklistBtn.addEventListener('click', openChecklistCreatorModal);
+if (headerAddChecklistBtn) headerAddChecklistBtn.addEventListener('click', () => openChecklistCreatorModal());
 
 // Dynamic Rules Builder in Creator
 const creatorRulesContainer = document.getElementById('creator-rules-container');
@@ -3170,11 +3604,16 @@ suggestionChips.forEach(chip => {
   });
 });
 
-// Category pills in Creator
-const creatorTypePills = document.querySelectorAll('#creator-type-pills .pill');
+// Category pills in Creator (Fixed for both #creator-type-group and #creator-type-pills)
+const creatorTypePills = document.querySelectorAll('#creator-type-group .pill, #creator-type-pills .pill');
 creatorTypePills.forEach(pill => {
   pill.addEventListener('click', () => {
-    creatorTypePills.forEach(p => p.classList.remove('active'));
+    const parent = pill.closest('#creator-type-group') || pill.closest('#creator-type-pills');
+    if (parent) {
+      parent.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+    } else {
+      creatorTypePills.forEach(p => p.classList.remove('active'));
+    }
     pill.classList.add('active');
   });
 });
@@ -3188,7 +3627,7 @@ creatorRrPills.forEach(pill => {
   });
 });
 
-// Checklist Creator Form Submission
+// Checklist Creator Form Submission (Create & Edit Modes)
 const checklistCreatorForm = document.getElementById('checklist-creator-form');
 if (checklistCreatorForm) {
   checklistCreatorForm.addEventListener('submit', (e) => {
@@ -3197,8 +3636,8 @@ if (checklistCreatorForm) {
     const name = document.getElementById('creator-setup-name')?.value.trim();
     if (!name) return;
 
-    const setupType = document.querySelector('#creator-type-pills .pill.active')?.getAttribute('data-type') || 'reversal';
-    const targetRr = document.querySelector('#creator-rr-pills .pill.active')?.getAttribute('data-rr') || '1:2.5';
+    const setupType = document.querySelector('#creator-type-group .pill.active, #creator-type-pills .pill.active')?.getAttribute('data-type') || 'reversal';
+    const targetRr = document.getElementById('creator-target-rr')?.value.trim() || document.querySelector('#creator-rr-pills .pill.active')?.getAttribute('data-rr') || '1:2.5';
 
     // Collect rules
     const ruleInputs = creatorRulesContainer.querySelectorAll('.rule-input');
@@ -3213,6 +3652,50 @@ if (checklistCreatorForm) {
       return;
     }
 
+    if (currentEditingPlaybookId) {
+      // EDIT MODE
+      const targetId = currentEditingPlaybookId;
+      const existing = playbookRegistry[targetId] || {};
+      existing.name = name;
+      existing.setupType = setupType;
+      existing.targetRr = targetRr;
+      existing.confluences = confluences;
+      existing.thesis = `Systematic ${setupType.toUpperCase()} playbook targeting minimum ${targetRr} Risk-to-Reward ratio.`;
+
+      playbookRegistry[targetId] = existing;
+      tradeStrategies[targetId] = {
+        name,
+        confluences
+      };
+
+      try {
+        let customSaved = JSON.parse(localStorage.getItem('dma_custom_playbooks') || '[]');
+        const idx = customSaved.findIndex(item => item.id === targetId);
+        if (idx !== -1) {
+          customSaved[idx] = existing;
+        } else {
+          customSaved.push(existing);
+        }
+        localStorage.setItem('dma_custom_playbooks', JSON.stringify(customSaved));
+      } catch (err) {
+        console.warn('Storage error', err);
+      }
+
+      if (window.DMA_DB && typeof window.DMA_DB.savePlaybook === 'function') {
+        window.DMA_DB.savePlaybook(existing).catch(err => console.warn('Firestore update error', err));
+      }
+
+      currentEditingPlaybookId = null;
+      closeChecklistCreatorModal();
+
+      if (typeof window.renderDashboardPlaybooks === 'function') window.renderDashboardPlaybooks(true);
+      if (typeof window.refreshPlaybookGrid === 'function') window.refreshPlaybookGrid(true);
+
+      alert(`✓ PLAYBOOK UPDATED!\n\n"${name}" has been updated successfully.`);
+      return;
+    }
+
+    // CREATE NEW MODE
     const newId = 'custom_' + Date.now();
     const newPlaybook = {
       id: newId,
@@ -3252,7 +3735,7 @@ if (checklistCreatorForm) {
     }
 
     // Live update on Dashboard
-    renderDashboardPlaybooks();
+    if (typeof window.renderDashboardPlaybooks === 'function') renderDashboardPlaybooks(true);
 
     // Also update Log Strategy Select
     const logStrategySelect = document.getElementById('log-strategy-select');
@@ -3266,7 +3749,7 @@ if (checklistCreatorForm) {
 
     closeChecklistCreatorModal();
     if (typeof window.refreshPlaybookGrid === 'function') {
-      window.refreshPlaybookGrid();
+      window.refreshPlaybookGrid(true);
     }
     alert(`✓ NEW PLAYBOOK SAVED!\n\n"${name}" is now live in Your Playbook and selectable in the trade logger.`);
   });
@@ -3337,7 +3820,7 @@ function initPlaybookWorkstation() {
     const q = searchQuery.toLowerCase().trim();
     const currentHash = `${activeFilter}|${q}|${JSON.stringify(playbooks.map(p => ({ id: p.id, name: p.name, wr: p.wr, pnl: p.pnl, type: p.setupType })))}`;
 
-    if (!force && grid.children.length > 0 && lastRenderedGridHash === currentHash) {
+    if (!force && (grid.children?.length || 0) > 0 && lastRenderedGridHash === currentHash) {
       return; // Skip destructive wipe if state is identical
     }
     lastRenderedGridHash = currentHash;
@@ -3384,15 +3867,22 @@ function initPlaybookWorkstation() {
 
     playbooks.forEach(pb => {
       const type = (pb.setupType || 'reversal').toLowerCase();
-      const wrNum = parseFloat(pb.wr) || 0;
       const name = pb.name || 'Setup Model';
       const thesis = pb.thesis || '';
       const confluences = pb.confluences || [];
       const confluencesStr = confluences.join(' ').toLowerCase();
 
+      // Real stats computed directly from user's logged trades
+      const realStats = getPlaybookRealStats(pb.id, name, type);
+      const wrNum = realStats.wrNum;
+      const wrDisplay = realStats.tradesCount > 0 ? `${wrNum}%` : '--%';
+      const tradesDisplay = realStats.tradesCountStr;
+      const pnlDisplay = realStats.pnlStr;
+      const pnlClean = realStats.totalPnl;
+
       // Filter by category
       let matchCat = true;
-      if (activeFilter === 'top') matchCat = wrNum >= 65;
+      if (activeFilter === 'top') matchCat = realStats.tradesCount > 0 && wrNum >= 60;
       else if (activeFilter !== 'all') matchCat = type === activeFilter;
 
       // Filter by search
@@ -3405,14 +3895,8 @@ function initPlaybookWorkstation() {
       if (!matchCat || !matchSearch) return;
 
       visibleCount++;
-      totalWrSum += wrNum;
-
-      let pnlClean = 0;
-      if (pb.pnlNum !== undefined) {
-        pnlClean = pb.pnlNum;
-      } else {
-        const pnlStr = (pb.pnl || '0').replace(/[^0-9.-]+/g, '');
-        pnlClean = parseFloat(pnlStr) || 0;
+      if (realStats.tradesCount > 0) {
+        totalWrSum += wrNum;
       }
       totalPnlSum += pnlClean;
 
@@ -3423,10 +3907,7 @@ function initPlaybookWorkstation() {
       card.setAttribute('data-wr', wrNum);
       card.setAttribute('data-name', name);
 
-      const followedWR = pb.followedWR || `${wrNum}%`;
-      const brokenWR = pb.brokenWR || '20.0%';
-      const followedValNum = parseFloat(followedWR) || 75;
-      const targetRr = pb.targetRr || '1:2.5+';
+      const targetRr = pb.targetRr || '1:2.5';
       const timeframe = pb.timeframe || (type === 'reversal' ? 'M15 / H4' : (type === 'trend' ? 'H1 / D1' : 'M5 / M15'));
 
       const rulesHtml = confluences.map(c => `
@@ -3435,6 +3916,11 @@ function initPlaybookWorkstation() {
           <span>${c}</span>
         </div>
       `).join('');
+
+      const followedWRText = realStats.followedCount > 0 ? `${realStats.followedWRStr} WR` : '--% WR';
+      const brokenWRText = realStats.brokenCount > 0 ? `${realStats.brokenWRStr} WR` : '--% WR';
+      const followedPct = realStats.followedCount > 0 ? realStats.followedWRNum : 50;
+      const brokenPct = realStats.brokenCount > 0 ? (100 - realStats.followedWRNum) : 50;
 
       card.innerHTML = `
         <div class="pb-card-header">
@@ -3451,26 +3937,26 @@ function initPlaybookWorkstation() {
         <div class="pb-stats-row">
           <div class="pb-mini-stat">
             <span class="pb-mini-stat-label">WIN RATE</span>
-            <span class="pb-mini-stat-val ${wrNum >= 60 ? 'green' : 'cyan'}">${pb.wr || wrNum + '%'}</span>
+            <span class="pb-mini-stat-val ${realStats.tradesCount > 0 && wrNum >= 60 ? 'green' : (realStats.tradesCount > 0 ? 'cyan' : '')}">${wrDisplay}</span>
           </div>
           <div class="pb-mini-stat">
             <span class="pb-mini-stat-label">TRADES</span>
-            <span class="pb-mini-stat-val">${pb.tradesCount || confluences.length * 8} Ex</span>
+            <span class="pb-mini-stat-val">${tradesDisplay}</span>
           </div>
           <div class="pb-mini-stat">
             <span class="pb-mini-stat-label">TOTAL P&L</span>
-            <span class="pb-mini-stat-val green">${pb.pnl || '+$1,500'}</span>
+            <span class="pb-mini-stat-val ${pnlClean > 0 ? 'green' : (pnlClean < 0 ? 'red' : '')}">${pnlDisplay}</span>
           </div>
         </div>
 
         <div class="pb-card-divergence">
           <div class="pb-divergence-bar-wrap">
-            <div class="fill-good" style="width: ${followedValNum}%;"></div>
-            <div class="fill-bad" style="width: ${100 - followedValNum}%;"></div>
+            <div class="fill-good" style="width: ${followedPct}%;"></div>
+            <div class="fill-bad" style="width: ${brokenPct}%;"></div>
           </div>
           <div class="pb-divergence-text-row">
-            <span class="good">✓ Followed: ${followedWR} WR</span>
-            <span class="bad">⚠ Broken: ${brokenWR} WR</span>
+            <span class="good">✓ Followed: ${followedWRText}</span>
+            <span class="bad">⚠ Broken: ${brokenWRText}</span>
           </div>
         </div>
 
@@ -3485,12 +3971,16 @@ function initPlaybookWorkstation() {
 
         <div class="pb-card-actions">
           <button type="button" class="btn-inspect-pb" data-action="inspect-pb" data-id="${pb.id}">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-            <span>INSPECT EDGE</span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            <span>INSPECT</span>
+          </button>
+          <button type="button" class="btn-edit-pb" data-action="edit-pb" data-id="${pb.id}">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+            <span>EDIT</span>
           </button>
           <button type="button" class="btn-trade-pb" data-action="trade-pb" data-id="${pb.id}">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-            <span>TRADE MODEL</span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+            <span>TRADE</span>
           </button>
         </div>
       `;
@@ -3498,6 +3988,11 @@ function initPlaybookWorkstation() {
       card.querySelector('[data-action="inspect-pb"]').addEventListener('click', (e) => {
         e.stopPropagation();
         openPlaybookDetailModal(pb.id);
+      });
+
+      card.querySelector('[data-action="edit-pb"]').addEventListener('click', (e) => {
+        e.stopPropagation();
+        openChecklistCreatorModal(pb.id);
       });
 
       card.querySelector('[data-action="trade-pb"]').addEventListener('click', (e) => {
@@ -3519,15 +4014,23 @@ function initPlaybookWorkstation() {
 
     if (kpiCount) kpiCount.textContent = `${visibleCount} Setup${visibleCount === 1 ? '' : 's'}`;
     if (kpiWr) {
-      const avgWr = visibleCount > 0 ? (totalWrSum / visibleCount).toFixed(1) : '0.0';
-      kpiWr.textContent = `${avgWr}%`;
+      let activeTradedCount = 0;
+      let sumWr = 0;
+      playbooks.forEach(pb => {
+        const st = getPlaybookRealStats(pb.id, pb.name, pb.setupType);
+        if (st.tradesCount > 0) {
+          activeTradedCount++;
+          sumWr += st.wrNum;
+        }
+      });
+      kpiWr.textContent = activeTradedCount > 0 ? `${(sumWr / activeTradedCount).toFixed(1)}% WR` : '--% WR';
     }
     if (kpiEdge) {
-      kpiEdge.textContent = visibleCount > 0 ? '+3.5x Edge' : '0x Edge';
+      kpiEdge.textContent = visibleCount > 0 ? 'Live Edge' : '-- Edge';
     }
     if (kpiPnl) {
       kpiPnl.textContent = totalPnlSum >= 0 ? `+$${totalPnlSum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `-$${Math.abs(totalPnlSum).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      kpiPnl.className = `digest-val ${totalPnlSum >= 0 ? 'green' : 'red'}`;
+      kpiPnl.className = `digest-val ${totalPnlSum > 0 ? 'green' : (totalPnlSum < 0 ? 'red' : 'neutral')}`;
     }
 
     if (visibleCount === 0) {
@@ -3604,9 +4107,10 @@ window.addEventListener('dma-data-synced', () => {
   if (typeof window.updateDashboardMetrics === 'function') {
     window.updateDashboardMetrics();
   } else if (typeof window.renderDashboardPlaybooks === 'function') {
-    window.renderDashboardPlaybooks();
+    window.renderDashboardPlaybooks(true);
   }
-  if (typeof window.refreshPlaybookGrid === 'function') window.refreshPlaybookGrid();
+  if (typeof window.refreshPlaybookGrid === 'function') window.refreshPlaybookGrid(true);
+  if (typeof window.refreshJournal === 'function') window.refreshJournal();
   const syncBadge = document.getElementById('cloud-sync-text');
   if (syncBadge) syncBadge.textContent = 'Cloud Synced';
 });
