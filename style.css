@@ -815,24 +815,70 @@ input, textarea, select { font-family: inherit; color: var(--ink); background-co
 }
 
 .stat-box h2 {
-  font-size: clamp(4.2rem, 9vw, 8.5rem);
+  font-size: clamp(3.4rem, 6.2vw, 6.4rem);
   font-weight: 800;
-  letter-spacing: -0.08em;
+  letter-spacing: -0.06em;
   font-family: var(--font-mono);
   background: linear-gradient(135deg, #ffffff 0%, #d4d4d8 35%, #97979f 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  line-height: 0.78;
+  line-height: 0.88;
   text-shadow: 0 8px 24px rgba(255,255,255,0.08);
+  white-space: nowrap;
 }
 
 .stat-box p {
   color: var(--ink-secondary);
   font-weight: 600;
   margin-top: 0.25rem;
-  font-size: clamp(1.2rem, 2.2vw, 1.8rem);
-  line-height: 1.18;
-  max-width: 12ch;
+  font-size: clamp(1.1rem, 2vw, 1.5rem);
+  line-height: 1.25;
+  max-width: 16ch;
+}
+
+.stat-subdetail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  width: 100%;
+}
+
+.subdetail-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: clamp(0.78rem, 1vw, 0.88rem);
+  color: var(--ink-muted, #94a3b8);
+  line-height: 1.35;
+  font-weight: 500;
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+}
+
+.subdetail-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.subdetail-dot.green {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+.subdetail-dot.red {
+  background: #f43f5e;
+  box-shadow: 0 0 6px rgba(244, 63, 94, 0.6);
+}
+
+.subdetail-item strong {
+  color: #f1f5f9;
+  font-weight: 700;
+}
+
+.stat-box.stat-box-loss .subdetail-item strong {
+  color: #fb7185;
 }
 
 @keyframes fadeUp {
@@ -1056,9 +1102,9 @@ input, textarea, select { font-family: inherit; color: var(--ink); background-co
   }
   
   .stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2rem; }
-  .stat-box { min-height: 280px; }
-  .stat-box h2 { font-size: clamp(5rem, 6vw, 10rem); }
-  .stat-box p { max-width: 14ch; }
+  .stat-box { min-height: 310px; }
+  .stat-box h2 { font-size: clamp(3.6rem, 4.8vw, 6.2rem); }
+  .stat-box p { max-width: 18ch; }
   
   .heavy-title { font-size: 3.5rem; text-align: center; }
   .heavy-subtitle { text-align: center; max-width: 700px; margin: 0 auto 5rem; }
@@ -6650,6 +6696,40 @@ body.filter-open .filter-sheet {
   font-weight: 700;
   color: #34d399;
   letter-spacing: 0.02em;
+  transition: all 0.2s ease;
+}
+
+.cloud-sync-badge.guest {
+  background: rgba(148, 163, 184, 0.08);
+  border-color: rgba(148, 163, 184, 0.25);
+  color: #94a3b8;
+  cursor: pointer;
+}
+.cloud-sync-badge.guest .cloud-sync-dot {
+  background: #94a3b8;
+  box-shadow: none;
+  animation: none;
+}
+
+.cloud-sync-badge.syncing {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.25);
+  color: #fbbf24;
+}
+.cloud-sync-badge.syncing .cloud-sync-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 6px #f59e0b;
+}
+
+.cloud-sync-badge.offline {
+  background: rgba(244, 63, 94, 0.08);
+  border-color: rgba(244, 63, 94, 0.25);
+  color: #f43f5e;
+}
+.cloud-sync-badge.offline .cloud-sync-dot {
+  background: #f43f5e;
+  box-shadow: 0 0 6px #f43f5e;
+  animation: none;
 }
 
 .cloud-sync-dot {
@@ -6793,11 +6873,303 @@ body.filter-open .filter-sheet {
     flex: 1;
     width: auto;
   }
-  .tab-btn {
-    padding: 0.32rem 0.55rem;
-    font-size: 0.72rem;
+
+/* ==========================================================================
+   APP TOAST & CONFIRMATION DIALOG SYSTEM (Native Browser Popup Replacement)
+   ========================================================================== */
+.app-toast-container {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  z-index: 999999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-width: 420px;
+  width: calc(100vw - 2.5rem);
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .app-toast-container {
+    top: 1rem;
+    left: 1rem;
+    right: 1rem;
+    width: auto;
+    max-width: none;
   }
 }
+
+.app-toast {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: rgba(15, 23, 42, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  color: #f1f5f9;
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateY(-16px) scale(0.96);
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.app-toast.show {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.app-toast.hide {
+  opacity: 0;
+  transform: translateY(-12px) scale(0.94);
+  pointer-events: none;
+}
+
+/* Toast Status Variants */
+.app-toast.toast-success {
+  border-color: rgba(16, 185, 129, 0.35);
+  box-shadow: 0 18px 40px -10px rgba(0, 0, 0, 0.7), 0 0 24px -6px rgba(16, 185, 129, 0.25);
+}
+.app-toast.toast-success .app-toast-icon {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.app-toast.toast-warning {
+  border-color: rgba(245, 158, 11, 0.4);
+  box-shadow: 0 18px 40px -10px rgba(0, 0, 0, 0.7), 0 0 24px -6px rgba(245, 158, 11, 0.25);
+}
+.app-toast.toast-warning .app-toast-icon {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.app-toast.toast-error {
+  border-color: rgba(244, 63, 94, 0.4);
+  box-shadow: 0 18px 40px -10px rgba(0, 0, 0, 0.7), 0 0 24px -6px rgba(244, 63, 94, 0.25);
+}
+.app-toast.toast-error .app-toast-icon {
+  background: rgba(244, 63, 94, 0.15);
+  color: #f43f5e;
+  border-color: rgba(244, 63, 94, 0.35);
+}
+
+.app-toast.toast-info {
+  border-color: rgba(56, 189, 248, 0.35);
+  box-shadow: 0 18px 40px -10px rgba(0, 0, 0, 0.7), 0 0 24px -6px rgba(56, 189, 248, 0.2);
+}
+.app-toast.toast-info .app-toast-icon {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+.app-toast-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 0.95rem;
+}
+
+.app-toast-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-toast-title {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.25;
+  margin-bottom: 0.2rem;
+  letter-spacing: 0.01em;
+}
+
+.app-toast-message {
+  font-size: 0.76rem;
+  color: #94a3b8;
+  line-height: 1.45;
+  word-break: break-word;
+  white-space: pre-line;
+}
+
+.app-toast-close {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0.2rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+  flex-shrink: 0;
+}
+.app-toast-close:hover {
+  color: #f1f5f9;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Modal Confirmation Dialog */
+.app-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 8, 15, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 1000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+}
+
+.app-dialog-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.app-dialog-card {
+  width: 100%;
+  max-width: 440px;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  padding: 1.5rem;
+  transform: scale(0.92) translateY(12px);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.app-dialog-backdrop.open .app-dialog-card {
+  transform: scale(1) translateY(0);
+}
+
+.app-dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.app-dialog-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.app-dialog-icon.danger {
+  background: rgba(244, 63, 94, 0.15);
+  color: #f43f5e;
+  border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+.app-dialog-icon.warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.app-dialog-icon.info {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.app-dialog-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.app-dialog-message {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  line-height: 1.55;
+  white-space: pre-line;
+  margin: 0;
+}
+
+.app-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 0.5rem;
+}
+
+.app-dialog-btn {
+  padding: 0.65rem 1.15rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-dialog-btn.cancel {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+}
+.app-dialog-btn.cancel:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.app-dialog-btn.confirm-danger {
+  background: #e11d48;
+  border-color: #f43f5e;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(225, 29, 72, 0.4);
+}
+.app-dialog-btn.confirm-danger:hover {
+  background: #be123c;
+}
+
+.app-dialog-btn.confirm-primary {
+  background: #10b981;
+  border-color: #34d399;
+  color: #042f2e;
+  font-weight: 800;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+}
+.app-dialog-btn.confirm-primary:hover {
+  background: #059669;
+  color: #ffffff;
+}
+
 
 
 

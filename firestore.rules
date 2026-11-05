@@ -61,17 +61,33 @@ service cloud.firestore {
     // Subcollection: users/{userId}/playbooks
     // Document ID: {playbookId}
     // Fields:
-    //   - id: string (optional, <= 100 chars, immutable)
+    //   - id: string | number (optional, <= 100 chars, immutable)
     //   - name: string (required, 1..100 chars)
     //   - setupType: string (required, 1..50 chars)
     //   - confluences: list (required, 1..50 items)
     //   - targetRr: string | number (optional, <= 30 chars)
+    //   - targetRR: string | number (optional, <= 30 chars)
     //   - thesis: string (optional, <= 1000 chars)
     //   - wr: string | number (optional, <= 20 chars)
-    //   - tradesCount: int (optional, >= 0)
+    //   - tradesCount: number (optional, >= 0)
     //   - followedWR: string | number (optional, <= 20 chars)
     //   - brokenWR: string | number (optional, <= 20 chars)
     //   - pnl: string | number (optional, <= 50 chars)
+    //   - timeframe: string (optional, <= 50 chars)
+    //   - isSample: bool (optional)
+    //   - date: string (optional, <= 100 chars)
+    //   - timestamp: number | timestamp (optional)
+    //   - notes: string (optional, <= 2000 chars)
+    //   - order: number (optional)
+    //   - followedBar: string | number (optional, <= 50 chars)
+    //   - brokenBar: string | number (optional, <= 50 chars)
+    //   - followedMeta: string (optional, <= 100 chars)
+    //   - brokenMeta: string (optional, <= 100 chars)
+    //   - multiplier: string (optional, <= 100 chars)
+    //   - potentialPnl: string | number (optional, <= 50 chars)
+    //   - actualPnl: string | number (optional, <= 50 chars)
+    //   - svgFollowed: string (optional, <= 1000 chars)
+    //   - svgActual: string (optional, <= 1000 chars)
     //   - createdAt: timestamp | number | string (optional, immutable)
     //   - updatedAt: timestamp | number | string (optional)
     //   - userId: string (optional, must match {userId}, immutable)
@@ -142,9 +158,10 @@ service cloud.firestore {
       return request.resource.data.keys().hasOnly(fields);
     }
 
-    // Ensure immutable fields are unchanged during update
+    // Ensure immutable fields are unchanged during update (only enforced if field existed in resource.data)
     function areImmutableFieldsUnchanged(fields) {
-      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+      return !request.resource.data.diff(resource.data).changedKeys().hasAny(fields) &&
+        !request.resource.data.diff(resource.data).removedKeys().hasAny(fields);
     }
 
     // Validate string length within bounds
@@ -253,8 +270,11 @@ service cloud.firestore {
     // Validate Playbook Document
     function isValidPlaybook(data, userId) {
       let allowed = [
-        'id', 'name', 'setupType', 'targetRr', 'confluences', 'thesis',
+        'id', 'name', 'setupType', 'targetRr', 'targetRR', 'confluences', 'thesis',
         'wr', 'tradesCount', 'followedWR', 'brokenWR', 'pnl',
+        'timeframe', 'isSample', 'date', 'timestamp', 'notes', 'order',
+        'followedBar', 'brokenBar', 'followedMeta', 'brokenMeta', 'multiplier',
+        'potentialPnl', 'actualPnl', 'svgFollowed', 'svgActual',
         'createdAt', 'updatedAt', 'userId', 'uid', 'ownerId'
       ];
       return data.keys().hasOnly(allowed) &&
@@ -262,14 +282,30 @@ service cloud.firestore {
         data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
         data.setupType is string && data.setupType.size() > 0 && data.setupType.size() <= 50 &&
         data.confluences is list && data.confluences.size() >= 1 && data.confluences.size() <= 50 &&
-        (!('id' in data) || (data.id is string && data.id.size() <= 100)) &&
+        (!('id' in data) || ((data.id is string && data.id.size() <= 100) || data.id is number)) &&
         (!('targetRr' in data) || ((data.targetRr is string && data.targetRr.size() <= 30) || data.targetRr is number)) &&
+        (!('targetRR' in data) || ((data.targetRR is string && data.targetRR.size() <= 30) || data.targetRR is number)) &&
         (!('thesis' in data) || (data.thesis is string && data.thesis.size() <= 1000)) &&
         (!('wr' in data) || ((data.wr is string && data.wr.size() <= 20) || data.wr is number)) &&
-        (!('tradesCount' in data) || (data.tradesCount is int && data.tradesCount >= 0)) &&
+        (!('tradesCount' in data) || (data.tradesCount is number && data.tradesCount >= 0)) &&
         (!('followedWR' in data) || ((data.followedWR is string && data.followedWR.size() <= 20) || data.followedWR is number)) &&
         (!('brokenWR' in data) || ((data.brokenWR is string && data.brokenWR.size() <= 20) || data.brokenWR is number)) &&
         (!('pnl' in data) || ((data.pnl is string && data.pnl.size() <= 50) || data.pnl is number)) &&
+        (!('timeframe' in data) || (data.timeframe is string && data.timeframe.size() <= 50)) &&
+        (!('isSample' in data) || (data.isSample is bool)) &&
+        (!('date' in data) || (data.date is string && data.date.size() <= 100)) &&
+        (!('timestamp' in data) || (data.timestamp is number || data.timestamp is timestamp)) &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000)) &&
+        (!('order' in data) || (data.order is number)) &&
+        (!('followedBar' in data) || ((data.followedBar is string && data.followedBar.size() <= 50) || data.followedBar is number)) &&
+        (!('brokenBar' in data) || ((data.brokenBar is string && data.brokenBar.size() <= 50) || data.brokenBar is number)) &&
+        (!('followedMeta' in data) || (data.followedMeta is string && data.followedMeta.size() <= 100)) &&
+        (!('brokenMeta' in data) || (data.brokenMeta is string && data.brokenMeta.size() <= 100)) &&
+        (!('multiplier' in data) || (data.multiplier is string && data.multiplier.size() <= 100)) &&
+        (!('potentialPnl' in data) || ((data.potentialPnl is string && data.potentialPnl.size() <= 50) || data.potentialPnl is number)) &&
+        (!('actualPnl' in data) || ((data.actualPnl is string && data.actualPnl.size() <= 50) || data.actualPnl is number)) &&
+        (!('svgFollowed' in data) || (data.svgFollowed is string && data.svgFollowed.size() <= 1000)) &&
+        (!('svgActual' in data) || (data.svgActual is string && data.svgActual.size() <= 1000)) &&
         (!('createdAt' in data) || isValidTimestampOrDate(data.createdAt)) &&
         (!('updatedAt' in data) || isValidTimestampOrDate(data.updatedAt)) &&
         (!('userId' in data) || (data.userId is string && data.userId == userId)) &&

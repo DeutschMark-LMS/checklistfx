@@ -1,4 +1,170 @@
 // ==========================================================================
+// IN-APP TOAST NOTIFICATION & CONFIRMATION DIALOG ENGINE
+// Replaces intrusive native browser alert() and confirm() popups
+// ==========================================================================
+
+function getOrCreateToastContainer() {
+  let container = document.getElementById('app-toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'app-toast-container';
+    container.className = 'app-toast-container';
+    document.body.appendChild(container);
+  }
+  return container;
+}
+
+/**
+ * Display sleek, trading-terminal in-app toast notification
+ * @param {Object} options - { title, message, type: 'success'|'warning'|'error'|'info', duration: 4000 }
+ */
+function showAppToast(options = {}) {
+  let { title = '', message = '', type = 'success', duration = 4000 } = options;
+  if (typeof options === 'string') {
+    message = options;
+    title = type === 'success' ? 'Success' : 'Checklist Fx';
+  }
+
+  const container = getOrCreateToastContainer();
+  const toast = document.createElement('div');
+  toast.className = `app-toast toast-${type}`;
+
+  const iconMap = {
+    success: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
+    warning: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+    error: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>',
+    info: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>'
+  };
+
+  const iconSvg = iconMap[type] || iconMap.info;
+
+  toast.innerHTML = `
+    <div class="app-toast-icon">${iconSvg}</div>
+    <div class="app-toast-body">
+      ${title ? `<div class="app-toast-title">${title}</div>` : ''}
+      <div class="app-toast-message">${message}</div>
+    </div>
+    <button type="button" class="app-toast-close" aria-label="Close notification">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </button>
+  `;
+
+  const closeBtn = toast.querySelector('.app-toast-close');
+  let dismissTimeout = null;
+
+  const dismiss = () => {
+    if (dismissTimeout) clearTimeout(dismissTimeout);
+    toast.classList.remove('show');
+    toast.classList.add('hide');
+    setTimeout(() => {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 300);
+  };
+
+  closeBtn.addEventListener('click', dismiss);
+  container.appendChild(toast);
+
+  // Trigger enter animation
+  requestAnimationFrame(() => {
+    toast.classList.add('show');
+  });
+
+  if (duration > 0) {
+    dismissTimeout = setTimeout(dismiss, duration);
+  }
+
+  return { dismiss };
+}
+window.showAppToast = showAppToast;
+
+/**
+ * Display modal confirmation dialog returning a Promise<boolean>
+ * Replaces native confirm() with sleek custom UI
+ */
+function showAppConfirm(options = {}) {
+  const {
+    title = 'Confirm Action',
+    message = 'Are you sure you want to proceed?',
+    confirmText = 'Confirm',
+    cancelText = 'Cancel',
+    type = 'danger'
+  } = options;
+
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'app-dialog-backdrop';
+
+    const iconMap = {
+      danger: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+      warning: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
+      info: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>'
+    };
+
+    const confirmBtnClass = type === 'danger' ? 'confirm-danger' : 'confirm-primary';
+
+    backdrop.innerHTML = `
+      <div class="app-dialog-card" role="dialog" aria-modal="true">
+        <div class="app-dialog-header">
+          <div class="app-dialog-icon ${type}">${iconMap[type] || iconMap.danger}</div>
+          <h3 class="app-dialog-title">${title}</h3>
+        </div>
+        <p class="app-dialog-message">${message}</p>
+        <div class="app-dialog-actions">
+          <button type="button" class="app-dialog-btn cancel" id="app-dialog-cancel-btn">${cancelText}</button>
+          <button type="button" class="app-dialog-btn ${confirmBtnClass}" id="app-dialog-confirm-btn">${confirmText}</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(backdrop);
+    requestAnimationFrame(() => backdrop.classList.add('open'));
+
+    const cleanup = (result) => {
+      backdrop.classList.remove('open');
+      setTimeout(() => {
+        if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+      }, 250);
+      resolve(result);
+    };
+
+    backdrop.querySelector('#app-dialog-confirm-btn').addEventListener('click', () => cleanup(true));
+    backdrop.querySelector('#app-dialog-cancel-btn').addEventListener('click', () => cleanup(false));
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) cleanup(false);
+    });
+  });
+}
+window.showAppConfirm = showAppConfirm;
+
+// Gracefully override window.alert so even legacy or inline HTML onclick="alert(...)" calls render as sleek in-app toasts
+window.alert = function(msg) {
+  if (typeof msg !== 'string') msg = String(msg || '');
+  let type = 'info';
+  let title = 'Checklist Fx';
+
+  if (msg.startsWith('✓') || msg.toLowerCase().includes('success') || msg.toLowerCase().includes('saved') || msg.toLowerCase().includes('synced') || msg.toLowerCase().includes('committed')) {
+    type = 'success';
+    title = 'Success';
+  } else if (msg.startsWith('⚠') || msg.toLowerCase().includes('violation') || msg.toLowerCase().includes('breach') || msg.toLowerCase().includes('warning') || msg.toLowerCase().includes('note:')) {
+    type = 'warning';
+    title = 'Trading Rule Notice';
+  } else if (msg.toLowerCase().includes('error') || msg.toLowerCase().includes('failed')) {
+    type = 'error';
+    title = 'Error';
+  }
+
+  const parts = msg.split('\n\n');
+  if (parts.length > 1) {
+    title = parts[0].replace(/^[✓⚠✗ℹ]\s*/, '').trim();
+    msg = parts.slice(1).join('\n\n').trim();
+  } else {
+    msg = msg.replace(/^[✓⚠✗ℹ]\s*/, '').trim();
+  }
+
+  showAppToast({ title, message: msg, type, duration: 4500 });
+};
+
+// ==========================================================================
 // GLOBAL USER PREFERENCES & PERSISTENCE
 // ==========================================================================
 function getUserPreferences() {
@@ -1330,9 +1496,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     if (deleteTradeBtn) {
-      deleteTradeBtn.addEventListener('click', () => {
+      deleteTradeBtn.addEventListener('click', async () => {
         if (!currentInspectedCard) return;
-        const confirmed = confirm('Are you sure you want to delete this trade from your journal? This will update your net P&L and metrics.');
+        const confirmed = await showAppConfirm({
+          title: 'Delete Trade from Journal?',
+          message: 'Are you sure you want to delete this trade from your journal? This will update your net P&L and performance metrics.',
+          confirmText: 'Delete Trade',
+          cancelText: 'Cancel',
+          type: 'danger'
+        });
         if (!confirmed) return;
 
         const tradeId = currentInspectedTradeId;
@@ -1352,6 +1524,12 @@ document.addEventListener('DOMContentLoaded', () => {
         currentInspectedCard.remove();
         closeTradeInspector();
         applyAllJournalFilters();
+
+        showAppToast({
+          title: 'Trade Deleted',
+          message: 'The trade has been removed from your journal and metrics.',
+          type: 'info'
+        });
       });
     }
 
@@ -1361,7 +1539,11 @@ document.addEventListener('DOMContentLoaded', () => {
       exportCsvBtn.addEventListener('click', () => {
         const cards = journalList.querySelectorAll('.trade-card');
         if (cards.length === 0) {
-          alert('No trades available in the journal to export.');
+          showAppToast({
+            title: 'Export Unavailable',
+            message: 'No trades available in the journal to export.',
+            type: 'info'
+          });
           return;
         }
 
@@ -2350,7 +2532,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const all = customTrades;
       if (all.length === 0) {
-        alert('No live trades logged yet. Log a trade in the Trade Terminal to export your journal report.');
+        showAppToast({
+          title: 'Export Unavailable',
+          message: 'No live trades logged yet. Log a trade in the Trade Terminal to export your journal report.',
+          type: 'info'
+        });
         return;
       }
 
@@ -3061,11 +3247,21 @@ if (logTradeForm) {
 
     closeLogTradeModal();
 
-    // Feedback Alert
+    // Feedback Alert via in-app toast
     if (isCompliant) {
-      alert(`✓ AUDITED TRADE COMMITTED TO LEDGER!\n\n${asset} ${direction} (${pnlFinal >= 0 ? '+$' + pnlFinal : '-$' + Math.abs(pnlFinal)})\nExecution Grade: ${debriefData.grade} (${debriefData.emotion})\n100% Plan Compliance (${met}/${total} Confluences Verified).\n\nCalm mind debrief locked.`);
+      showAppToast({
+        title: 'Audited Trade Committed!',
+        message: `${asset} ${direction} (${pnlFinal >= 0 ? '+$' + pnlFinal : '-$' + Math.abs(pnlFinal)})\nGrade: ${debriefData.grade} (${debriefData.emotion}) · 100% Plan Compliance (${met}/${total} Confluences Verified).`,
+        type: 'success',
+        duration: 5000
+      });
     } else {
-      alert(`⚠ AUDITED TRADE COMMITTED (RULE BREACH)\n\n${asset} ${direction} (${pnlFinal >= 0 ? '+$' + pnlFinal : '-$' + Math.abs(pnlFinal)})\nExecution Grade: ${debriefData.grade} (${debriefData.emotion})\nMissing: ${total - met} of ${total} confluences.\n\nRetrospective recorded & added to FOMO Tax.`);
+      showAppToast({
+        title: 'Trade Logged (Rule Breach)',
+        message: `${asset} ${direction} (${pnlFinal >= 0 ? '+$' + pnlFinal : '-$' + Math.abs(pnlFinal)})\nGrade: ${debriefData.grade} (${debriefData.emotion}) · Missing ${total - met} of ${total} confluences. Logged under Rules Broken.`,
+        type: 'warning',
+        duration: 5500
+      });
     }
   });
 }
@@ -3676,16 +3872,21 @@ if (pbEditBtn) {
 // Delete Playbook action
 const pbDeleteBtn = document.getElementById('pb-delete-btn');
 if (pbDeleteBtn) {
-  pbDeleteBtn.addEventListener('click', () => {
+  pbDeleteBtn.addEventListener('click', async () => {
     if (!activeInspectingPlaybookId) return;
 
     const targetId = activeInspectingPlaybookId;
     const pb = playbookRegistry[targetId];
     const pbName = pb ? pb.name : 'this playbook';
 
-    if (!confirm(`Delete "${pbName}"?\n\nThis will remove the setup and its checklist rules from your active playbooks.`)) {
-      return;
-    }
+    const confirmed = await showAppConfirm({
+      title: 'Delete Playbook?',
+      message: `Are you sure you want to delete "${pbName}"?\n\nThis will remove the setup and its checklist rules from your active playbooks.`,
+      confirmText: 'Delete Playbook',
+      cancelText: 'Cancel',
+      type: 'danger'
+    });
+    if (!confirmed) return;
 
     // 1. Delete from in-memory objects immediately
     delete playbookRegistry[targetId];
@@ -3728,6 +3929,12 @@ if (pbDeleteBtn) {
 
     const pill = document.querySelector(`#log-strategy-group .strategy-pill[data-strategy="${targetId}"]`);
     if (pill) pill.remove();
+
+    showAppToast({
+      title: 'Playbook Deleted',
+      message: `"${pbName}" has been removed from your playbooks.`,
+      type: 'info'
+    });
   });
 }
 
@@ -3872,7 +4079,11 @@ function appendRuleRow(initialValue = '', customPlaceholder = '') {
       row.remove();
       updateRuleNumbers();
     } else {
-      alert('A playbook must have at least one confluence rule.');
+      showAppToast({
+        title: 'Rule Required',
+        message: 'A playbook must have at least one confluence rule.',
+        type: 'warning'
+      });
     }
   });
 
@@ -3893,7 +4104,11 @@ if (creatorRulesContainer) {
         btn.closest('.creator-rule-row').remove();
         updateRuleNumbers();
       } else {
-        alert('A playbook must have at least one confluence rule.');
+        showAppToast({
+          title: 'Rule Required',
+          message: 'A playbook must have at least one confluence rule.',
+          type: 'warning'
+        });
       }
     });
   });
@@ -3952,7 +4167,11 @@ if (checklistCreatorForm) {
     });
 
     if (confluences.length === 0) {
-      alert('Please add at least one confluence rule.');
+      showAppToast({
+        title: 'Rules Required',
+        message: 'Please add at least one confluence rule.',
+        type: 'warning'
+      });
       return;
     }
 
@@ -3986,7 +4205,37 @@ if (checklistCreatorForm) {
       }
 
       if (window.DMA_DB && typeof window.DMA_DB.savePlaybook === 'function') {
-        window.DMA_DB.savePlaybook(existing).catch(err => console.warn('Firestore update error', err));
+        window.DMA_DB.savePlaybook(existing).then(res => {
+          if (res && res.isGuest) {
+            showAppToast({
+              title: 'Playbook Updated (Local Only)',
+              message: `"${name}" updated on this device.\n\n⚠ Note: You are browsing as a guest. Sign in to back up your changes to the cloud.`,
+              type: 'warning',
+              duration: 5500
+            });
+          } else if (res && res.cloudSaved) {
+            showAppToast({
+              title: 'Playbook Updated & Synced!',
+              message: `"${name}" is safely backed up to your Checklist Fx cloud account.`,
+              type: 'success',
+              duration: 4000
+            });
+          } else if (res && res.error) {
+            showAppToast({
+              title: 'Playbook Updated Locally',
+              message: `Cloud sync pending (${res.error.message || 'Network'}). Saved to this device.`,
+              type: 'warning',
+              duration: 4500
+            });
+          }
+        }).catch(err => console.warn('Firestore update error', err));
+      } else {
+        showAppToast({
+          title: 'Playbook Updated!',
+          message: `"${name}" has been updated successfully.`,
+          type: 'success',
+          duration: 3500
+        });
       }
 
       currentEditingPlaybookId = null;
@@ -3994,8 +4243,6 @@ if (checklistCreatorForm) {
 
       if (typeof window.renderDashboardPlaybooks === 'function') window.renderDashboardPlaybooks(true);
       if (typeof window.refreshPlaybookGrid === 'function') window.refreshPlaybookGrid(true);
-
-      alert(`✓ PLAYBOOK UPDATED!\n\n"${name}" has been updated successfully.`);
       return;
     }
 
@@ -4033,8 +4280,38 @@ if (checklistCreatorForm) {
 
     // Persist to Cloud Firestore backend
     if (window.DMA_DB && typeof window.DMA_DB.savePlaybook === 'function') {
-      window.DMA_DB.savePlaybook(newPlaybook).catch(err => {
+      window.DMA_DB.savePlaybook(newPlaybook).then(res => {
+        if (res && res.isGuest) {
+          showAppToast({
+            title: 'New Playbook Saved (Local Only)',
+            message: `"${name}" is active!\n\n⚠ Note: You are currently browsing as a guest. Data will be cleared if you wipe site storage. Sign in to permanently save to your cloud account.`,
+            type: 'warning',
+            duration: 6000
+          });
+        } else if (res && res.cloudSaved) {
+          showAppToast({
+            title: 'New Playbook Saved & Synced!',
+            message: `"${name}" is live and safely backed up to your Checklist Fx cloud account.`,
+            type: 'success',
+            duration: 4500
+          });
+        } else if (res && res.error) {
+          showAppToast({
+            title: 'New Playbook Saved (Local Cache)',
+            message: `"${name}" is saved on this device. Cloud sync pending (${res.error.message || 'Permission/Network'}).`,
+            type: 'warning',
+            duration: 4500
+          });
+        }
+      }).catch(err => {
         console.warn('[DMA Backend] Firestore savePlaybook error:', err);
+      });
+    } else {
+      showAppToast({
+        title: 'New Playbook Saved!',
+        message: `"${name}" is now live in Your Playbook and selectable in the trade logger.`,
+        type: 'success',
+        duration: 4000
       });
     }
 
@@ -4055,7 +4332,6 @@ if (checklistCreatorForm) {
     if (typeof window.refreshPlaybookGrid === 'function') {
       window.refreshPlaybookGrid(true);
     }
-    alert(`✓ NEW PLAYBOOK SAVED!\n\n"${name}" is now live in Your Playbook and selectable in the trade logger.`);
   });
 }
 

@@ -86,6 +86,39 @@ try {
 }
 
 /**
+ * Update UI Cloud Sync status pill and tooltip across pages
+ */
+function updateCloudSyncIndicator(status, message, details) {
+  const badge = document.getElementById('cloud-sync-badge');
+  const text = document.getElementById('cloud-sync-text');
+  if (!badge) return;
+
+  badge.classList.remove('syncing', 'guest', 'offline');
+
+  if (status === 'synced') {
+    badge.title = details || 'Firebase Firestore Cloud Connected';
+    if (text) text.textContent = message || 'Cloud Synced';
+    badge.onclick = null;
+  } else if (status === 'syncing') {
+    badge.classList.add('syncing');
+    badge.title = details || 'Synchronizing with Cloud Firestore...';
+    if (text) text.textContent = message || 'Syncing...';
+    badge.onclick = null;
+  } else if (status === 'guest') {
+    badge.classList.add('guest');
+    badge.title = details || 'Guest Mode: Data saved to this phone only. Tap to Log In and sync to cloud.';
+    if (text) text.textContent = message || 'Local Only (Sign In)';
+    badge.onclick = () => { window.location.href = 'login.html'; };
+  } else if (status === 'offline') {
+    badge.classList.add('offline');
+    badge.title = details || 'Offline / Cloud Error: Will retry when connection is restored.';
+    if (text) text.textContent = message || 'Offline';
+    badge.onclick = null;
+  }
+}
+window.updateCloudSyncIndicator = updateCloudSyncIndicator;
+
+/**
  * Format Firebase user into standardized DMA user object
  */
 function normalizeUser(fbUser, customName) {
@@ -391,14 +424,31 @@ const DMA_DB = {
    */
   async saveTrade(trade) {
     const user = auth?.currentUser;
+    let cloudSaved = false;
+    let cloudError = null;
+
     if (user && db) {
       try {
+        updateCloudSyncIndicator('syncing', 'Syncing...');
+        const cleanTrade = {
+          ...trade,
+          id: String(trade.id),
+          userId: user.uid,
+          updatedAt: Date.now()
+        };
         const tradeRef = doc(db, 'users', user.uid, 'trades', String(trade.id));
-        await setDoc(tradeRef, trade, { merge: true });
+        await setDoc(tradeRef, cleanTrade, { merge: true });
+        cloudSaved = true;
+        updateCloudSyncIndicator('synced', 'Cloud Synced');
       } catch (err) {
-        console.warn('[DMA Firestore] Error saving trade to cloud:', err);
+        cloudError = err;
+        console.error('[DMA Firestore] Error saving trade to cloud:', err);
+        updateCloudSyncIndicator('offline', 'Sync Error');
       }
+    } else {
+      updateCloudSyncIndicator('guest', 'Local Only (Sign In)');
     }
+
     // Also save to localStorage cache
     try {
       const stored = JSON.parse(localStorage.getItem('dma_trades') || '[]');
@@ -407,7 +457,7 @@ const DMA_DB = {
       else stored.unshift(trade);
       localStorage.setItem('dma_trades', JSON.stringify(stored));
     } catch (_) {}
-    return trade;
+    return { trade, cloudSaved, error: cloudError, isGuest: !user };
   },
 
   /**
@@ -460,14 +510,40 @@ const DMA_DB = {
    */
   async savePlaybook(playbook) {
     const user = auth?.currentUser;
+    let cloudSaved = false;
+    let cloudError = null;
+
     if (user && db) {
       try {
+        updateCloudSyncIndicator('syncing', 'Syncing...');
+        const cleanPb = {
+          id: String(playbook.id),
+          name: String(playbook.name || '').trim(),
+          setupType: String(playbook.setupType || 'reversal').trim(),
+          confluences: Array.isArray(playbook.confluences) ? playbook.confluences : [],
+          targetRr: String(playbook.targetRr || playbook.targetRR || '1:2.5'),
+          thesis: String(playbook.thesis || ''),
+          wr: String(playbook.wr || '0.0%'),
+          tradesCount: Number(playbook.tradesCount) || 0,
+          followedWR: String(playbook.followedWR || '0.0%'),
+          brokenWR: String(playbook.brokenWR || '0.0%'),
+          pnl: String(playbook.pnl || '$0.00'),
+          userId: user.uid,
+          updatedAt: Date.now()
+        };
         const pbRef = doc(db, 'users', user.uid, 'playbooks', String(playbook.id));
-        await setDoc(pbRef, playbook, { merge: true });
+        await setDoc(pbRef, cleanPb, { merge: true });
+        cloudSaved = true;
+        updateCloudSyncIndicator('synced', 'Cloud Synced');
       } catch (err) {
-        console.warn('[DMA Firestore] Error saving playbook to cloud:', err);
+        cloudError = err;
+        console.error('[DMA Firestore] Error saving playbook to cloud:', err);
+        updateCloudSyncIndicator('offline', 'Sync Error');
       }
+    } else {
+      updateCloudSyncIndicator('guest', 'Local Only (Sign In)');
     }
+
     // Also save to localStorage
     try {
       const stored = JSON.parse(localStorage.getItem('dma_custom_playbooks') || '[]');
@@ -476,7 +552,8 @@ const DMA_DB = {
       else stored.push(playbook);
       localStorage.setItem('dma_custom_playbooks', JSON.stringify(stored));
     } catch (_) {}
-    return playbook;
+
+    return { playbook, cloudSaved, error: cloudError, isGuest: !user };
   },
 
   /**
@@ -530,6 +607,7 @@ const DMA_DB = {
   async syncUserData(uid) {
     if (!db || !uid) return;
     try {
+      updateCloudSyncIndicator('syncing', 'Syncing...');
       // Execute all 3 Firestore queries in parallel to speed up load time 3x
       const [pbSnap, tradesSnap, uDoc] = await Promise.all([
         getDocs(collection(db, 'users', uid, 'playbooks')).catch(e => { console.warn('PB fetch error', e); return { forEach: () => {} }; }),
@@ -552,10 +630,21 @@ const DMA_DB = {
         cloudPbs.forEach(p => pbMap.set(String(p.id), p));
         const mergedPbs = Array.from(pbMap.values());
         localStorage.setItem('dma_custom_playbooks', JSON.stringify(mergedPbs));
+
+        // Upload any local playbooks that were created while offline or in guest mode
+        localPbs.forEach(lp => {
+          if (!cloudPbs.some(cp => String(cp.id) === String(lp.id))) {
+            const cleanLp = { ...lp, userId: uid, updatedAt: Date.now() };
+            setDoc(doc(db, 'users', uid, 'playbooks', String(lp.id)), cleanLp, { merge: true }).catch(err => {
+              console.warn('[DMA Firestore] Error uploading local playbook to cloud:', err);
+            });
+          }
+        });
       } else if (localPbs.length > 0) {
         // Cloud has 0 playbooks, sync local playbooks up to cloud
         localPbs.forEach(p => {
-          setDoc(doc(db, 'users', uid, 'playbooks', String(p.id)), p, { merge: true }).catch(() => {});
+          const cleanP = { ...p, userId: uid, updatedAt: Date.now() };
+          setDoc(doc(db, 'users', uid, 'playbooks', String(p.id)), cleanP, { merge: true }).catch(() => {});
         });
       }
 
@@ -574,10 +663,21 @@ const DMA_DB = {
         cloudTrades.forEach(t => tradeMap.set(String(t.id), t));
         const mergedTrades = Array.from(tradeMap.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         localStorage.setItem('dma_trades', JSON.stringify(mergedTrades));
+
+        // Upload any local trades created offline
+        localTrades.forEach(lt => {
+          if (!cloudTrades.some(ct => String(ct.id) === String(lt.id))) {
+            const cleanLt = { ...lt, userId: uid, updatedAt: Date.now() };
+            setDoc(doc(db, 'users', uid, 'trades', String(lt.id)), cleanLt, { merge: true }).catch(err => {
+              console.warn('[DMA Firestore] Error uploading local trade to cloud:', err);
+            });
+          }
+        });
       } else if (localTrades.length > 0) {
         // Cloud has 0 trades, sync local trades up to cloud
         localTrades.forEach(t => {
-          setDoc(doc(db, 'users', uid, 'trades', String(t.id)), t, { merge: true }).catch(() => {});
+          const cleanT = { ...t, userId: uid, updatedAt: Date.now() };
+          setDoc(doc(db, 'users', uid, 'trades', String(t.id)), cleanT, { merge: true }).catch(() => {});
         });
       }
 
@@ -588,10 +688,13 @@ const DMA_DB = {
         }
       } catch (_) {}
 
+      updateCloudSyncIndicator('synced', 'Cloud Synced');
+
       // Dispatch event to refresh app views
       window.dispatchEvent(new CustomEvent('dma-data-synced'));
     } catch (err) {
       console.warn('[DMA Firestore] Sync error:', err);
+      updateCloudSyncIndicator('offline', 'Sync Error');
     }
   },
 
@@ -630,6 +733,8 @@ if (auth) {
       localStorage.setItem('dma_user', JSON.stringify(standardUser));
       localStorage.setItem('dma_active_user', JSON.stringify(standardUser));
 
+      updateCloudSyncIndicator('synced', 'Cloud Synced', 'Signed in as ' + user.email);
+
       // Trigger cloud database sync for user
       DMA_DB.syncUserData(user.uid);
 
@@ -647,6 +752,8 @@ if (auth) {
       try {
         window.dispatchEvent(new CustomEvent('dma-auth-changed', { detail: standardUser }));
       } catch (_) {}
+    } else {
+      updateCloudSyncIndicator('guest', 'Local Only (Sign In)');
     }
   });
 }
