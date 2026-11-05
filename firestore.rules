@@ -20,6 +20,8 @@ service cloud.firestore {
     //   - photoURL: string (optional, valid URL, <= 1000 chars)
     //   - handle: string (optional, <= 50 chars)
     //   - trading_style: string (optional, <= 100 chars)
+    //   - preferences: map (optional, <= 30 keys)
+    //   - accounts: list (optional, <= 20 items)
     //
     // Subcollection: users/{userId}/trades
     // Document ID: {tradeId}
@@ -36,6 +38,7 @@ service cloud.firestore {
     //   - strategyKey: string (optional, <= 100 chars)
     //   - outcome: string (optional, 'win' | 'loss' | 'breakeven' | 'open')
     //   - pnl: number (optional)
+    //   - pnlPercent: number (optional)
     //   - rMultiple: string (optional, <= 20 chars)
     //   - confluencesMet: int (optional, 0..100)
     //   - totalConfluences: int (optional, 0..100)
@@ -44,6 +47,10 @@ service cloud.firestore {
     //   - breachReason: string (optional, <= 200 chars)
     //   - screenshotUrl: string (optional, <= 1000 chars)
     //   - notes: string (optional, <= 2000 chars)
+    //   - debrief: map (optional, <= 15 keys)
+    //   - retrospective: string (optional, <= 2000 chars)
+    //   - accountId: string (optional, <= 100 chars)
+    //   - accountName: string (optional, <= 100 chars)
     //   - date: string (optional, <= 100 chars)
     //   - timestamp: number | timestamp (optional)
     //   - updatedAt: timestamp | number | string (optional)
@@ -180,7 +187,8 @@ service cloud.firestore {
     function isValidUserProfile(data) {
       let allowed = [
         'uid', 'email', 'displayName', 'user_metadata',
-        'createdAt', 'updatedAt', 'photoURL', 'handle', 'trading_style'
+        'createdAt', 'updatedAt', 'photoURL', 'handle', 'trading_style',
+        'preferences', 'accounts'
       ];
       return data.keys().hasOnly(allowed) &&
         data.keys().hasAll(['uid', 'email']) &&
@@ -192,7 +200,9 @@ service cloud.firestore {
         (!('photoURL' in data) || data.photoURL == null || (data.photoURL is string && data.photoURL.size() <= 1000 && isValidUrl(data.photoURL))) &&
         (!('createdAt' in data) || isValidTimestampOrDate(data.createdAt)) &&
         (!('updatedAt' in data) || isValidTimestampOrDate(data.updatedAt)) &&
-        (!('user_metadata' in data) || (data.user_metadata is map && data.user_metadata.size() <= 20));
+        (!('user_metadata' in data) || (data.user_metadata is map && data.user_metadata.size() <= 20)) &&
+        (!('preferences' in data) || (data.preferences is map && data.preferences.size() <= 30)) &&
+        (!('accounts' in data) || (data.accounts is list && data.accounts.size() <= 20));
     }
 
     // Validate Trade Document
@@ -202,7 +212,8 @@ service cloud.firestore {
         'exitPrice', 'stopLoss', 'takeProfit', 'strategy', 'strategyKey',
         'outcome', 'pnl', 'rMultiple', 'confluencesMet', 'totalConfluences',
         'confluences', 'isCompliant', 'breachReason', 'screenshotUrl', 'notes',
-        'date', 'timestamp', 'updatedAt', 'userId', 'uid', 'ownerId'
+        'date', 'timestamp', 'updatedAt', 'userId', 'uid', 'ownerId',
+        'debrief', 'retrospective', 'accountId', 'accountName', 'pnlPercent'
       ];
       return data.keys().hasOnly(allowed) &&
         data.keys().hasAll(['asset', 'direction']) &&
@@ -218,6 +229,7 @@ service cloud.firestore {
         (!('strategyKey' in data) || (data.strategyKey is string && data.strategyKey.size() <= 100)) &&
         (!('outcome' in data) || (data.outcome is string && (data.outcome in ['win', 'loss', 'breakeven', 'WIN', 'LOSS', 'BREAKEVEN', 'open', 'OPEN']))) &&
         (!('pnl' in data) || (data.pnl is number)) &&
+        (!('pnlPercent' in data) || (data.pnlPercent is number)) &&
         (!('rMultiple' in data) || (data.rMultiple is string && data.rMultiple.size() <= 20)) &&
         (!('confluencesMet' in data) || (data.confluencesMet is int && data.confluencesMet >= 0 && data.confluencesMet <= 100)) &&
         (!('totalConfluences' in data) || (data.totalConfluences is int && data.totalConfluences >= 0 && data.totalConfluences <= 100)) &&
@@ -226,6 +238,10 @@ service cloud.firestore {
         (!('breachReason' in data) || (data.breachReason is string && data.breachReason.size() <= 200)) &&
         (!('screenshotUrl' in data) || data.screenshotUrl == '' || (data.screenshotUrl is string && data.screenshotUrl.size() <= 1000)) &&
         (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000)) &&
+        (!('debrief' in data) || (data.debrief is map && data.debrief.size() <= 15)) &&
+        (!('retrospective' in data) || (data.retrospective is string && data.retrospective.size() <= 2000)) &&
+        (!('accountId' in data) || (data.accountId is string && data.accountId.size() <= 100)) &&
+        (!('accountName' in data) || (data.accountName is string && data.accountName.size() <= 100)) &&
         (!('date' in data) || (data.date is string && data.date.size() <= 100)) &&
         (!('timestamp' in data) || (data.timestamp is number || data.timestamp is timestamp)) &&
         (!('updatedAt' in data) || isValidTimestampOrDate(data.updatedAt)) &&

@@ -2071,8 +2071,29 @@ body.nav-open .side-drawer {
 .trade-meta {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
   font-size: 0.9rem;
   color: var(--ink-secondary);
+}
+
+.trade-account-pill {
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  padding: 0.12rem 0.45rem;
+  border-radius: 4px;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  white-space: nowrap;
+}
+
+.gate-missed-tag {
+  color: #f43f5e;
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  margin-left: 0.35rem;
 }
 
 .trade-footer {

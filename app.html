@@ -230,6 +230,19 @@
 
     <form class="log-trade-form simplified-form" id="log-trade-form">
       
+      <!-- Account Context Selection -->
+      <div class="creator-input-group log-account-section" style="margin-bottom: 0.85rem;">
+        <div class="card-header-flex" style="margin-bottom: 0.35rem;">
+          <span class="sub-label">TRADING ACCOUNT CONTEXT</span>
+          <span class="account-risk-pill" id="log-account-risk-pill" style="font-size: 0.68rem; font-family: var(--font-mono); color: #38bdf8; background: rgba(56, 189, 248, 0.1); padding: 0.15rem 0.5rem; border-radius: 4px; border: 1px solid rgba(56, 189, 248, 0.25);">1.0% Risk ($1,000)</span>
+        </div>
+        <select class="strategy-dropdown-select" id="log-account-select">
+          <option value="acc_funded_100k" data-name="Funded Prop ($100k)" data-size="100000" data-risk="1.0">Funded Prop ($100,000 · 1% = $1,000)</option>
+          <option value="acc_personal_10k" data-name="Personal Live ($10k)" data-size="10000" data-risk="2.0">Personal Live ($10,000 · 2% = $200)</option>
+          <option value="acc_challenge_50k" data-name="Challenge Phase 1 ($50k)" data-size="50000" data-risk="1.0">Challenge Phase 1 ($50,000 · 1% = $500)</option>
+        </select>
+      </div>
+
       <!-- Manual Instrument / Pair & Direction Row -->
       <div class="pair-direction-grid">
         <div class="manual-pair-block">
@@ -306,13 +319,19 @@
         <p id="compliance-desc">Select all satisfied confluence gates above and tap "Verify Confluences" to audit execution adherence.</p>
         
         <div class="breach-reason-group" id="breach-reason-group" style="display: none;">
-          <span class="sub-label" style="color: rgba(244, 63, 94, 0.9);">BREACH REASON (FOR FOMO AUDIT)</span>
+          <span class="sub-label" style="color: rgba(244, 63, 94, 0.9);">EXECUTION DIAGNOSIS (MARK DOUGLAS COGNITIVE AUDIT)</span>
           <select class="breach-select" id="breach-reason-select">
-            <option value="Impulse entry (FOMO)">Impulse entry / Chased green candle (FOMO)</option>
-            <option value="Revenge trade">Revenge trade after prior loss</option>
-            <option value="Entered without HTF sweep">Entered before 4H sweep confirmed</option>
-            <option value="Poor R:R ratio (<1:2)">Risk:Reward profile under minimum threshold</option>
-            <option value="Deviated from trading hours">Out-of-session entry (outside London/NY)</option>
+            <optgroup label="Rule Deviations & Cognitive Pitfalls">
+              <option value="Premature Entry">Premature Entry — Jumped the gun before confirmation</option>
+              <option value="Ignored Structural Red Flags">Selective Perception — Ignored higher timeframe invalidation</option>
+              <option value="Hesitation & Late Chase">Hesitation Error — Froze on signal, then chased at worse price</option>
+              <option value="Impulse entry (FOMO)">Impulse Entry (FOMO) — Chased moving price without setup</option>
+              <option value="Impatience / Boredom Trade">Impatience / Action-Seeking — Forced trade during chop</option>
+              <option value="Revenge / Recapturing Loss">Combative Mindset — Revenge entry to make back recent loss</option>
+              <option value="Overconfidence / Sizing Breach">Euphoria / Overconfidence — Violated sizing rule after win</option>
+              <option value="Risk Miscalculation (<1:2 R:R)">Flawed Risk Definition — Unfavorable risk-to-reward ratio</option>
+              <option value="Out-of-Session Deviation">Session Violation — Traded outside core London/NY liquidity hours</option>
+            </optgroup>
           </select>
         </div>
       </div>
@@ -336,6 +355,11 @@
               required
             >
           </div>
+        </div>
+        <!-- Live Account Impact & Normalized Risk Multiplier -->
+        <div class="account-impact-readout" id="account-impact-readout" style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.45rem; padding: 0.4rem 0.65rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; font-size: 0.72rem; font-family: var(--font-mono); color: var(--ink-secondary);">
+          <span>Account Impact: <b id="account-impact-percent" style="color: #fff;">0.00%</b></span>
+          <span>Normalized R: <b id="account-impact-r" style="color: #38bdf8;">0.0R</b></span>
         </div>
       </div>
 
@@ -422,14 +446,14 @@
 
         <!-- 2. Emotional State / Mindset Picker -->
         <div class="debrief-form-section" style="margin-bottom: 0.85rem;">
-          <span class="sub-label" style="margin-bottom: 0.3rem;">EMOTIONAL STATE DURING TRADE</span>
+          <span class="sub-label" style="margin-bottom: 0.3rem;">EMOTIONAL STATE DURING TRADE (MARK DOUGLAS MINDSET)</span>
           <div class="debrief-pill-picker" id="log-debrief-emotion-picker">
-            <button type="button" class="debrief-pill active" data-emotion="Calm & Patient">🧘 Calm & Patient</button>
-            <button type="button" class="debrief-pill" data-emotion="Confident">🎯 Confident</button>
-            <button type="button" class="debrief-pill" data-emotion="Anxious">⚡ Anxious</button>
-            <button type="button" class="debrief-pill" data-emotion="FOMO / Chasing">🔥 FOMO / Chasing</button>
-            <button type="button" class="debrief-pill" data-emotion="Revenge / Tilted">💥 Revenge / Tilted</button>
-            <button type="button" class="debrief-pill" data-emotion="Greedy">💰 Greedy</button>
+            <button type="button" class="debrief-pill active" data-emotion="Calm & Detached">🧘 Calm & Detached</button>
+            <button type="button" class="debrief-pill" data-emotion="Focused & Decisive">🎯 Focused & Decisive</button>
+            <button type="button" class="debrief-pill" data-emotion="Hesitant / Anxious">⚡ Hesitant / Anxious</button>
+            <button type="button" class="debrief-pill" data-emotion="FOMO / Urgency">🔥 FOMO / Urgency</button>
+            <button type="button" class="debrief-pill" data-emotion="Combative / Revenge">💥 Combative / Revenge</button>
+            <button type="button" class="debrief-pill" data-emotion="Euphoric / Greedy">💰 Euphoric / Greedy</button>
           </div>
         </div>
 
@@ -438,10 +462,10 @@
           <span class="sub-label" style="margin-bottom: 0.3rem;">EXIT EXECUTION QUALITY</span>
           <div class="debrief-pill-picker" id="log-debrief-exit-picker">
             <button type="button" class="debrief-pill active" data-exit="Target Hit">🎯 Target Hit Exactly</button>
-            <button type="button" class="debrief-pill" data-exit="Disciplined Stop">🛡️ Clean SL at Invalidation</button>
+            <button type="button" class="debrief-pill" data-exit="Clean Invalidation">🛡️ Clean SL at Invalidation</button>
             <button type="button" class="debrief-pill" data-exit="Trailing Stop">📈 Trailed Stop Locked</button>
-            <button type="button" class="debrief-pill" data-exit="Panic Exit">⚠️ Premature / Panic Exit</button>
-            <button type="button" class="debrief-pill" data-exit="Moved Stop">❌ Moved Stop Loss</button>
+            <button type="button" class="debrief-pill" data-exit="Fear of Giving Back">⚠️ Fear of Giving Back (Cut Early)</button>
+            <button type="button" class="debrief-pill" data-exit="Refused Invalidation">❌ Refused Loss (Moved Stop)</button>
           </div>
         </div>
 

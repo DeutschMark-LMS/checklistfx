@@ -477,6 +477,7 @@ document.addEventListener('DOMContentLoaded', () => {
       asset: 'all',
       direction: 'all',
       setup: 'all',
+      account: 'all',
       date: 'all',
       customFrom: null,
       customTo: null
@@ -514,6 +515,9 @@ document.addEventListener('DOMContentLoaded', () => {
       card.setAttribute('data-compliance', t.isCompliant ? 'true' : 'false');
       card.setAttribute('data-confluences-met', t.confluencesMet || (t.isCompliant ? 4 : 1));
       card.setAttribute('data-confluences-total', t.totalConfluences || 4);
+      card.setAttribute('data-account-id', t.accountId || 'acc_funded_100k');
+      card.setAttribute('data-account-name', t.accountName || 'Funded Prop ($100k)');
+      card.setAttribute('data-pnl-percent', t.pnlPercent ? (t.pnlPercent > 0 ? `+${t.pnlPercent}` : `${t.pnlPercent}`) : '');
 
       // Debrief & Retrospective info
       let debrief = t.debrief || null;
@@ -537,13 +541,20 @@ document.addEventListener('DOMContentLoaded', () => {
       const gradeLetter = (debrief.grade || 'A').charAt(0).toLowerCase();
       const gradeBadgeHtml = `<span class="trade-debrief-badge grade-${gradeLetter}">${debrief.grade}</span>`;
       
-      const tags = [
-        debrief.emotion || (t.isCompliant ? 'Calm & Patient' : 'FOMO'),
-        t.isCompliant ? 'Rules Followed' : (t.breachReason || 'Rules Broken')
-      ];
-      if (debrief.exitQuality && debrief.exitQuality !== 'Target Hit') {
-        tags.push(debrief.exitQuality);
+      const rawTags = [];
+      if (t.accountName) rawTags.push(t.accountName);
+      if (debrief.emotion) rawTags.push(debrief.emotion);
+      if (t.isCompliant) {
+        rawTags.push('Rules Followed');
+      } else if (t.breachReason && t.breachReason !== debrief.emotion) {
+        rawTags.push(t.breachReason);
+      } else if (!t.isCompliant) {
+        rawTags.push('Rules Broken');
       }
+      if (debrief.exitQuality && !debrief.exitQuality.includes('Target Hit')) {
+        rawTags.push(debrief.exitQuality);
+      }
+      const tags = [...new Set(rawTags.filter(Boolean))];
       card.setAttribute('data-tags', JSON.stringify(tags));
 
       const defaultConfluences = t.isCompliant 
@@ -571,6 +582,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const lessonsText = debrief.lessons || (t.retrospective || (t.notes && !t.notes.includes('100% adherence') && !t.notes.includes('Rule breach') ? t.notes : ''));
       const retrospectiveHtml = lessonsText ? `<div class="trade-retrospective-snippet">"${lessonsText}"</div>` : '';
 
+      const pnlPctDisplay = t.pnlPercent !== undefined && t.pnlPercent !== null && t.pnlPercent !== '' ? ` (${Number(t.pnlPercent) > 0 ? '+' : ''}${t.pnlPercent}%)` : '';
+
       card.innerHTML = `
         <div class="trade-header">
           <div class="trade-asset">
@@ -578,11 +591,15 @@ document.addEventListener('DOMContentLoaded', () => {
             <span class="ticker">${t.asset || 'XAUUSD'}</span>
             ${gradeBadgeHtml}
           </div>
-          <div class="trade-pnl ${isWin ? 'win' : 'loss'}">${pnlFormatted}</div>
+          <div class="trade-pnl-wrap" style="text-align: right;">
+            <div class="trade-pnl ${isWin ? 'win' : 'loss'}">${pnlFormatted}</div>
+            <div class="trade-pnl-sub" style="font-size: 0.72rem; font-family: var(--font-mono); color: var(--ink-muted);">${rMult}${pnlPctDisplay}</div>
+          </div>
         </div>
         <div class="trade-meta">
           <span class="time">${displayTime}</span>
           <span class="setup-name">${strategyTitle}</span>
+          <span class="trade-account-pill">${t.accountName || 'Funded Prop ($100k)'}</span>
         </div>
         <div class="trade-tags">
           ${tagBadgesHtml}
@@ -792,6 +809,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let matchAdv = true;
         if (advFilters.asset !== 'all' && asset !== advFilters.asset.toLowerCase()) matchAdv = false;
         if (advFilters.direction !== 'all' && direction !== advFilters.direction.toLowerCase()) matchAdv = false;
+        if (advFilters.setup !== 'all' && setup !== advFilters.setup.toLowerCase()) matchAdv = false;
+        if (advFilters.account !== 'all' && (card.getAttribute('data-account-id') || 'acc_funded_100k') !== advFilters.account) matchAdv = false;
         let matchCalDate = true;
         if (activeCalFilteredDate) {
           matchCalDate = getTradeDateKey(card) === activeCalFilteredDate;
@@ -955,7 +974,7 @@ document.addEventListener('DOMContentLoaded', () => {
       activeTab = 'all';
       activeDateFilter = 'all';
       searchQuery = '';
-      advFilters = { asset: 'all', direction: 'all', setup: 'all', date: 'all', customFrom: null, customTo: null };
+      advFilters = { asset: 'all', direction: 'all', setup: 'all', account: 'all', date: 'all', customFrom: null, customTo: null };
 
       const searchInputEl = document.getElementById('journal-search-input');
       const clearBtnEl = document.getElementById('clear-search-btn');
@@ -1074,6 +1093,7 @@ document.addEventListener('DOMContentLoaded', () => {
         advFilters.asset = document.querySelector('#adv-filter-asset .pill.active')?.getAttribute('data-val') || 'all';
         advFilters.direction = document.querySelector('#adv-filter-direction .pill.active')?.getAttribute('data-val') || 'all';
         advFilters.setup = document.querySelector('#adv-filter-setup .pill.active')?.getAttribute('data-val') || 'all';
+        advFilters.account = document.querySelector('#adv-filter-account .pill.active')?.getAttribute('data-val') || 'all';
 
         const sheetDateVal = document.querySelector('#adv-filter-date .pill.active')?.getAttribute('data-val') || 'all';
         activeDateFilter = sheetDateVal;
@@ -1191,7 +1211,18 @@ document.addEventListener('DOMContentLoaded', () => {
         pnlValEl.className = `inspector-pnl-val ${isWin ? 'green' : 'red'}`;
       }
 
-      if (rmultValEl) rmultValEl.textContent = `${rmult} Realized`;
+      if (rmultValEl) {
+        const pnlPct = card.getAttribute('data-pnl-percent');
+        const accName = card.getAttribute('data-account-name');
+        let rmultText = `${rmult} Realized`;
+        if (pnlPct) {
+          rmultText += ` (${pnlPct}%)`;
+        }
+        if (accName) {
+          rmultText += ` · ${accName}`;
+        }
+        rmultValEl.textContent = rmultText;
+      }
 
       if (compBadgeEl) {
         compBadgeEl.className = `inspector-compliance-badge ${isCompliant ? 'green' : 'red'}`;
@@ -1204,7 +1235,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (timeStampEl) timeStampEl.textContent = timeText;
 
       if (tagsContainerEl) {
-        tagsContainerEl.innerHTML = tags.map(tag => `<span class="psych-tag ${isCompliant ? 'good' : 'bad'}">${tag}</span>`).join(' ');
+        const uniqueTags = [...new Set(tags.filter(Boolean))];
+        tagsContainerEl.innerHTML = uniqueTags.map(tag => `<span class="psych-tag ${isCompliant ? 'good' : 'bad'}">${tag}</span>`).join(' ');
       }
 
       const metCount = card.getAttribute('data-confluences-met') || (isCompliant ? confluences.length : 1);
@@ -1212,12 +1244,25 @@ document.addEventListener('DOMContentLoaded', () => {
       if (gatesCountEl) gatesCountEl.textContent = `${metCount}/${totalCount}`;
 
       if (gatesListEl) {
-        gatesListEl.innerHTML = confluences.map((c, i) => {
-          const isMet = isCompliant || i === 0;
+        gatesListEl.innerHTML = confluences.map(c => {
+          let text = '';
+          let isMet = false;
+          if (typeof c === 'object' && c !== null) {
+            text = c.text || '';
+            isMet = Boolean(c.met);
+          } else if (typeof c === 'string') {
+            if (c.includes('(MISSED)')) {
+              text = c.replace(/\s*\(MISSED\)$/i, '').trim();
+              isMet = false;
+            } else {
+              text = c.trim();
+              isMet = true;
+            }
+          }
           return `
             <div class="inspector-gate-item">
               <span class="gate-status-icon ${isMet ? 'met' : 'broken'}">${isMet ? '✓' : '✕'}</span>
-              <span>${c}</span>
+              <span>${text}${isMet ? '' : ' <span class="gate-missed-tag">(MISSED)</span>'}</span>
             </div>
           `;
         }).join('');
@@ -2453,6 +2498,10 @@ function openLogTradeModal() {
   });
   const lessonsInput = document.getElementById('log-debrief-lessons-input');
   if (lessonsInput) lessonsInput.value = '';
+
+  if (typeof updateAccountImpactReadout === 'function') {
+    updateAccountImpactReadout();
+  }
 }
 
 function closeLogTradeModal() {
@@ -2750,8 +2799,54 @@ pnlSignBtns.forEach(btn => {
     } else {
       btn.classList.add('neg');
     }
+    updateAccountImpactReadout();
   });
 });
+
+// Live Multi-Account Sizing & Normalized Impact Readout
+function updateAccountImpactReadout() {
+  const accountSelect = document.getElementById('log-account-select');
+  const riskPill = document.getElementById('log-account-risk-pill');
+  const impactPercentEl = document.getElementById('account-impact-percent');
+  const impactREl = document.getElementById('account-impact-r');
+  const pnlInput = document.getElementById('trade-pnl-input');
+
+  const opt = accountSelect?.options[accountSelect.selectedIndex];
+  const accSize = parseFloat(opt?.getAttribute('data-size')) || 100000;
+  const riskPercent = parseFloat(opt?.getAttribute('data-risk')) || 1.0;
+  const riskDollars = accSize * (riskPercent / 100);
+
+  if (riskPill) {
+    riskPill.textContent = `${riskPercent.toFixed(1)}% Risk ($${Math.round(riskDollars).toLocaleString()})`;
+  }
+
+  const pnlRaw = Math.abs(parseFloat(pnlInput?.value) || 0);
+  const pnlFinal = activePnlSign === '-' ? -pnlRaw : pnlRaw;
+  const impactPct = accSize > 0 ? ((pnlFinal / accSize) * 100) : 0;
+  const rValue = riskDollars > 0 ? (pnlFinal / riskDollars) : 0;
+
+  if (impactPercentEl) {
+    const sign = impactPct > 0 ? '+' : '';
+    impactPercentEl.textContent = `${sign}${impactPct.toFixed(2)}%`;
+    impactPercentEl.style.color = pnlFinal > 0 ? '#10b981' : (pnlFinal < 0 ? '#f43f5e' : '#fff');
+  }
+
+  if (impactREl) {
+    const rSign = rValue > 0 ? '+' : '';
+    impactREl.textContent = `${rSign}${rValue.toFixed(1)}R`;
+    impactREl.style.color = pnlFinal > 0 ? '#10b981' : (pnlFinal < 0 ? '#f43f5e' : '#38bdf8');
+  }
+}
+
+const logAccountSelect = document.getElementById('log-account-select');
+if (logAccountSelect) {
+  logAccountSelect.addEventListener('change', updateAccountImpactReadout);
+}
+
+const tradePnlInput = document.getElementById('trade-pnl-input');
+if (tradePnlInput) {
+  tradePnlInput.addEventListener('input', updateAccountImpactReadout);
+}
 
 // TradingView Screenshot Preview & Paste
 const tvScreenshotInput = document.getElementById('trade-screenshot-url');
@@ -2857,9 +2952,26 @@ if (logTradeForm) {
     rows.forEach(r => { if (r.classList.contains('checked')) met++; });
     const isCompliant = (met === total && total > 0);
 
+    const accountSelect = document.getElementById('log-account-select');
+    const selectedOpt = accountSelect?.options[accountSelect.selectedIndex];
+    const accountId = accountSelect?.value || 'acc_funded_100k';
+    const accountName = selectedOpt?.getAttribute('data-name') || 'Funded Prop ($100k)';
+    const accountSize = parseFloat(selectedOpt?.getAttribute('data-size')) || 100000;
+    const accountRiskPct = parseFloat(selectedOpt?.getAttribute('data-risk')) || 1.0;
+    const riskDollarAmount = accountSize * (accountRiskPct / 100);
+
     const pnlRaw = Math.abs(parseFloat(document.getElementById('trade-pnl-input')?.value) || 0);
     const pnlFinal = activePnlSign === '-' ? -pnlRaw : pnlRaw;
-    const rMultiple = pnlFinal >= 0 ? '+2.2R' : '-1.0R';
+    const pnlPercent = accountSize > 0 ? parseFloat(((pnlFinal / accountSize) * 100).toFixed(2)) : 0;
+
+    let rMultiple = '0.0R';
+    if (riskDollarAmount > 0) {
+      const rNum = pnlFinal / riskDollarAmount;
+      const rSign = rNum > 0 ? '+' : '';
+      rMultiple = `${rSign}${rNum.toFixed(1)}R`;
+    } else {
+      rMultiple = pnlFinal >= 0 ? '+2.0R' : '-1.0R';
+    }
 
     const screenshotUrl = document.getElementById('trade-screenshot-url')?.value?.trim() || '';
     const breachReasonSelect = document.getElementById('breach-reason-select');
@@ -2894,7 +3006,10 @@ if (logTradeForm) {
       strategyKey: activeStrategyKey,
       outcome: pnlFinal >= 0 ? 'win' : 'loss',
       pnl: pnlFinal,
+      pnlPercent,
       rMultiple,
+      accountId,
+      accountName,
       confluencesMet: met,
       totalConfluences: total,
       confluences: confluencesList,
@@ -2982,6 +3097,7 @@ function saveTradeDraft() {
 
   const draft = {
     isOpen: true,
+    account: document.getElementById('log-account-select')?.value || 'acc_funded_100k',
     asset: assetInput ? assetInput.value : '',
     strategy: strategySelect ? strategySelect.value : '',
     direction: activeDirBtn ? activeDirBtn.getAttribute('data-direction') : 'long',
@@ -3034,6 +3150,14 @@ function restoreTradeDraft() {
 
     const assetInput = document.getElementById('trade-asset-input');
     if (assetInput && draft.asset) assetInput.value = draft.asset;
+
+    const accountSelect = document.getElementById('log-account-select');
+    if (accountSelect && draft.account) {
+      accountSelect.value = draft.account;
+    }
+    if (typeof updateAccountImpactReadout === 'function') {
+      updateAccountImpactReadout();
+    }
 
     if (draft.direction) {
       document.querySelectorAll('.dir-btn').forEach(btn => {
