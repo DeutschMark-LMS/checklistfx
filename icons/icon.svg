@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#141417" />
+      <stop offset="100%" stop-color="#09090b" />
+    </linearGradient>
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#2563eb" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Background rounded squircle -->
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)"/>
+  
+  <!-- Subtle border outline -->
+  <rect x="4" y="4" width="504" height="504" rx="124" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="8"/>
+
+  <!-- Checklist Shield / Checkmark Container -->
+  <g transform="translate(106, 106)" filter="url(#glow)">
+    <!-- Shield / Card Path: viewBox 24x24 scaled by 12.5 (300px) -->
+    <path d="M262.5 150v87.5a25 25 0 0 1-25 25H62.5a25 25 0 0 1-25-25V62.5a25 25 0 0 1 25-25h137.5" 
+          fill="none" 
+          stroke="url(#brandGrad)" 
+          stroke-width="28" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"/>
+    <!-- Checkmark Path -->
+    <polyline points="112.5 137.5 150 175 275 50" 
+              fill="none" 
+              stroke="#60a5fa" 
+              stroke-width="32" 
+              stroke-linecap="round" 
+              stroke-linejoin="round"/>
+  </g>
+</svg>
+

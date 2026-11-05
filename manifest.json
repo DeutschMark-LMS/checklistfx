@@ -1,0 +1,68 @@
+{
+  "name": "Checklist Fx | Trading Discipline & Journal",
+  "short_name": "Checklist Fx",
+  "description": "Rule-governed trade execution checklist, capital shield, and automated trading journal.",
+  "start_url": "./app.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "categories": ["finance", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Checklist App",
+      "short_name": "Checklist",
+      "description": "Open Rule Checklist & Shield",
+      "url": "./app.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Trade Journal",
+      "short_name": "Journal",
+      "description": "View logged trades & post-trade debrief",
+      "url": "./journal.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Strategy Playbook",
+      "short_name": "Playbook",
+      "description": "View & edit setup models",
+      "url": "./playbook.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Performance Analytics",
+      "short_name": "Analytics",
+      "description": "Review win-rate & discipline metrics",
+      "url": "./analytics.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
+

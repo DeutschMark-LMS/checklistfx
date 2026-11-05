@@ -1165,6 +1165,51 @@ input, textarea, select { font-family: inherit; color: var(--ink); background-co
   outline: none;
 }
 
+.password-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.password-input-wrap input {
+  padding-right: 3.25rem !important;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  padding: 0.45rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-muted, #71717a);
+  cursor: pointer;
+  border-radius: var(--radius-sm, 6px);
+  transition: color 0.15s ease, background-color 0.15s ease;
+  z-index: 2;
+}
+
+.password-toggle-btn:hover {
+  color: var(--ink, #ffffff);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.password-toggle-btn svg {
+  display: block;
+  pointer-events: none;
+}
+
+.password-toggle-btn .hidden,
+.eye-icon.hidden,
+.eye-off-icon.hidden {
+  display: none !important;
+}
+
 .form-group input:focus {
   border-color: rgba(255, 255, 255, 0.3);
   background: #000;

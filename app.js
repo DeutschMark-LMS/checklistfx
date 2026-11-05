@@ -599,9 +599,17 @@ document.addEventListener('DOMContentLoaded', () => {
       return card;
     }
 
-    function renderAllJournalTrades() {
+    let lastRenderedJournalHash = '';
+
+    function renderAllJournalTrades(force = false) {
       try {
         const customTrades = JSON.parse(localStorage.getItem('dma_trades') || '[]');
+        const currentHash = JSON.stringify(customTrades.map(t => [t.id, t.pnl, t.asset, t.isCompliant, t.timestamp]));
+        if (!force && (journalList.children?.length || 0) > 0 && lastRenderedJournalHash === currentHash) {
+          return; // Skip destructive wipe if data has not changed
+        }
+        lastRenderedJournalHash = currentHash;
+
         journalList.innerHTML = '';
         if (customTrades.length > 0) {
           const groups = {};
@@ -1719,12 +1727,9 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     initJournalModule();
   }
-  window.addEventListener('dma-data-synced', () => {
-    if (typeof window.refreshJournal === 'function') window.refreshJournal();
-  });
   window.addEventListener('storage', (e) => {
     if (e.key === 'dma_trades' && typeof window.refreshJournal === 'function') {
-      window.refreshJournal();
+      window.refreshJournal(false);
     }
   });
 
@@ -2459,6 +2464,10 @@ function closeLogTradeModal() {
   modal.setAttribute('aria-hidden', 'true');
   backdrop.classList.remove('open');
   document.body.style.overflow = '';
+
+  try {
+    localStorage.removeItem('dma_active_trade_draft');
+  } catch (_) {}
 }
 
 function renderConfluenceChecklist(strategyKey) {
@@ -2947,6 +2956,177 @@ if (logTradeForm) {
 }
 
 // Local storage trade rendering & journal interactions are managed by initJournalModule()
+
+// ==========================================================================
+// PWA DRAFT PERSISTENCE & MULTITASKING BACKGROUND RESILIENCE
+// Prevents active trade drafts and forms from vanishing when minimizing the app
+// ==========================================================================
+function saveTradeDraft() {
+  const modal = document.getElementById('log-trade-modal');
+  if (!modal || !modal.classList.contains('open')) return;
+
+  const assetInput = document.getElementById('trade-asset-input');
+  const strategySelect = document.getElementById('log-strategy-select');
+  const pnlInput = document.getElementById('trade-pnl-input');
+  const screenshotInput = document.getElementById('trade-screenshot-url');
+  const lessonsInput = document.getElementById('log-debrief-lessons-input');
+  const activeDirBtn = document.querySelector('.dir-btn.active');
+  const signToggle = document.getElementById('pnl-sign-toggle');
+
+  const checkedIndices = [];
+  document.querySelectorAll('.confluence-item-row').forEach(row => {
+    if (row.classList.contains('checked')) {
+      checkedIndices.push(row.getAttribute('data-idx'));
+    }
+  });
+
+  const draft = {
+    isOpen: true,
+    asset: assetInput ? assetInput.value : '',
+    strategy: strategySelect ? strategySelect.value : '',
+    direction: activeDirBtn ? activeDirBtn.getAttribute('data-direction') : 'long',
+    pnl: pnlInput ? pnlInput.value : '',
+    pnlSign: signToggle ? signToggle.textContent.trim() : '+',
+    screenshot: screenshotInput ? screenshotInput.value : '',
+    grade: typeof activeLogGrade !== 'undefined' ? activeLogGrade : 'A+',
+    gradeTitle: typeof activeLogGradeTitle !== 'undefined' ? activeLogGradeTitle : '',
+    emotion: typeof activeLogEmotion !== 'undefined' ? activeLogEmotion : 'Calm & Patient',
+    exit: typeof activeLogExit !== 'undefined' ? activeLogExit : 'Target Hit',
+    lessons: lessonsInput ? lessonsInput.value : '',
+    checkedIndices: checkedIndices,
+    savedAt: Date.now()
+  };
+
+  try {
+    localStorage.setItem('dma_active_trade_draft', JSON.stringify(draft));
+  } catch (_) {}
+}
+
+function restoreTradeDraft() {
+  try {
+    const raw = localStorage.getItem('dma_active_trade_draft');
+    if (!raw) return;
+    const draft = JSON.parse(raw);
+    if (!draft || !draft.isOpen) return;
+
+    // Discard drafts older than 12 hours
+    if (Date.now() - draft.savedAt > 12 * 60 * 60 * 1000) {
+      localStorage.removeItem('dma_active_trade_draft');
+      return;
+    }
+
+    const modal = document.getElementById('log-trade-modal');
+    const backdrop = document.getElementById('log-trade-backdrop');
+    if (!modal || !backdrop) return;
+
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+    backdrop.classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    if (draft.strategy) {
+      activeStrategyKey = draft.strategy;
+      const strategySelect = document.getElementById('log-strategy-select');
+      if (strategySelect) strategySelect.value = draft.strategy;
+      if (typeof updateModalStrategyHeader === 'function') updateModalStrategyHeader(draft.strategy);
+      if (typeof renderConfluenceChecklist === 'function') renderConfluenceChecklist(draft.strategy);
+    }
+
+    const assetInput = document.getElementById('trade-asset-input');
+    if (assetInput && draft.asset) assetInput.value = draft.asset;
+
+    if (draft.direction) {
+      document.querySelectorAll('.dir-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-direction') === draft.direction);
+      });
+      activeDirection = draft.direction;
+    }
+
+    const pnlInput = document.getElementById('trade-pnl-input');
+    if (pnlInput && draft.pnl) pnlInput.value = draft.pnl;
+
+    const signToggle = document.getElementById('pnl-sign-toggle');
+    if (signToggle && draft.pnlSign) signToggle.textContent = draft.pnlSign;
+
+    const screenshotInput = document.getElementById('trade-screenshot-url');
+    if (screenshotInput && draft.screenshot) screenshotInput.value = draft.screenshot;
+
+    const lessonsInput = document.getElementById('log-debrief-lessons-input');
+    if (lessonsInput && draft.lessons) lessonsInput.value = draft.lessons;
+
+    if (draft.grade) {
+      activeLogGrade = draft.grade;
+      activeLogGradeTitle = draft.gradeTitle || '';
+      document.querySelectorAll('#log-debrief-grades-picker .debrief-grade-btn').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-grade') === draft.grade);
+      });
+    }
+
+    if (draft.emotion) {
+      activeLogEmotion = draft.emotion;
+      document.querySelectorAll('#log-debrief-emotion-picker .debrief-pill').forEach(p => {
+        p.classList.toggle('active', p.getAttribute('data-emotion') === draft.emotion);
+      });
+    }
+
+    if (draft.exit) {
+      activeLogExit = draft.exit;
+      document.querySelectorAll('#log-debrief-exit-picker .debrief-pill').forEach(p => {
+        p.classList.toggle('active', p.getAttribute('data-exit') === draft.exit);
+      });
+    }
+
+    if (Array.isArray(draft.checkedIndices)) {
+      document.querySelectorAll('.confluence-item-row').forEach(row => {
+        if (draft.checkedIndices.includes(row.getAttribute('data-idx'))) {
+          row.classList.add('checked');
+        }
+      });
+      if (typeof onConfluenceRowToggled === 'function') onConfluenceRowToggled();
+    }
+  } catch (err) {
+    console.warn('[PWA] Restore draft warning:', err);
+  }
+}
+
+// Remember current active page route
+try {
+  const currentPath = window.location.pathname.split('/').pop() || 'index.html';
+  if (currentPath && currentPath !== 'login.html' && currentPath !== 'signup.html') {
+    localStorage.setItem('dma_last_active_route', currentPath);
+  }
+} catch (_) {}
+
+// Lifecycle listeners for multitasking / phone minimize / tab switching
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    saveTradeDraft();
+  } else if (document.visibilityState === 'visible') {
+    restoreTradeDraft();
+    // Silently sync background cloud data without full-page reloads
+    if (window.DMA_DB && window.firebaseAuth?.currentUser) {
+      window.DMA_DB.syncUserData(window.firebaseAuth.currentUser.uid);
+    }
+  }
+});
+
+window.addEventListener('pagehide', () => {
+  saveTradeDraft();
+});
+
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted) {
+    console.log('[PWA] Resumed from Back-Forward Cache (bfcache)');
+  }
+  restoreTradeDraft();
+});
+
+// Restore on initial load if user reopened browser tab with open draft
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', restoreTradeDraft);
+} else {
+  restoreTradeDraft();
+}
 
 
 // ==========================================================================
@@ -4101,18 +4281,27 @@ function initPlaybookWorkstation() {
   window.refreshPlaybookGrid = renderGrid;
 }
 
-// Global Cloud Firestore Sync Listener
+// Global Cloud Firestore Sync Listener (Debounced & Non-Destructive to eliminate UI twitch)
+let syncDebounceTimer = null;
 window.addEventListener('dma-data-synced', () => {
-  console.log('[DMA Backend] Cloud Firestore sync event received');
-  if (typeof window.updateDashboardMetrics === 'function') {
-    window.updateDashboardMetrics();
-  } else if (typeof window.renderDashboardPlaybooks === 'function') {
-    window.renderDashboardPlaybooks(true);
-  }
-  if (typeof window.refreshPlaybookGrid === 'function') window.refreshPlaybookGrid(true);
-  if (typeof window.refreshJournal === 'function') window.refreshJournal();
-  const syncBadge = document.getElementById('cloud-sync-text');
-  if (syncBadge) syncBadge.textContent = 'Cloud Synced';
+  if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
+  syncDebounceTimer = setTimeout(() => {
+    console.log('[DMA Backend] Cloud Firestore sync event received');
+    if (typeof window.updateDashboardMetrics === 'function') {
+      window.updateDashboardMetrics();
+    }
+    if (typeof window.renderDashboardPlaybooks === 'function') {
+      window.renderDashboardPlaybooks(false);
+    }
+    if (typeof window.refreshPlaybookGrid === 'function') {
+      window.refreshPlaybookGrid(false);
+    }
+    if (typeof window.refreshJournal === 'function') {
+      window.refreshJournal(false);
+    }
+    const syncBadge = document.getElementById('cloud-sync-text');
+    if (syncBadge) syncBadge.textContent = 'Cloud Synced';
+  }, 60);
 });
 
 if (document.readyState === 'loading') {
@@ -4120,4 +4309,26 @@ if (document.readyState === 'loading') {
 } else {
   initPlaybookWorkstation();
 }
+
+// ==========================================================================
+// PWA SERVICE WORKER REGISTRATION & INSTALL PROMPT
+// ==========================================================================
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').then((reg) => {
+      console.log('[PWA] ServiceWorker registered with scope:', reg.scope);
+    }).catch((err) => {
+      console.log('[PWA] ServiceWorker registration failed:', err);
+    });
+  });
+}
+
+// Capture BeforeInstallPromptEvent to offer native-like mobile install experience
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  window.deferredPWAInstallPrompt = e;
+  window.dispatchEvent(new CustomEvent('dma-pwa-installable'));
+  console.log('[PWA] App is ready to be installed on mobile');
+});
+
 
