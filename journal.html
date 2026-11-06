@@ -18,6 +18,12 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
   
   <link rel="stylesheet" href="style.css?v=v2.6">
+  <script>
+    if (typeof window !== 'undefined' && location.protocol !== 'file:' && (location.pathname.endsWith('.html') || location.pathname.endsWith('/index') || location.pathname === '/index')) {
+      const cleanPath = location.pathname.replace(/\/index(\.html)?$/i, '/').replace(/\.html$/i, '') || '/';
+      history.replaceState(null, '', cleanPath + location.search + location.hash);
+    }
+  </script>
   <!-- Firebase Auth SDK (v12) -->
   <script type="module" src="firebaseClient.js"></script>
   <script src="app.js?v=v2.5" defer></script>

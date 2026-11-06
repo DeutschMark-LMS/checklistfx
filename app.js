@@ -217,12 +217,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   routeButtons.forEach((button) => {
     button.addEventListener('click', (event) => {
-      const target = button.getAttribute('data-route');
+      let target = button.getAttribute('data-route');
       if (!target) return;
 
-      // Allow native browser navigation for <a> links to prevent white/reload flash
-      if (button.tagName === 'A' && button.getAttribute('href') === target) {
-        return;
+      if (window.location.protocol !== 'file:') {
+        target = target.replace(/\.html$/i, '');
+        if (target === 'index' || target === '') target = '/';
       }
 
       event.preventDefault();
@@ -253,7 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const profileButton = document.querySelector('[data-action="profile"]');
   if (profileButton) {
     profileButton.addEventListener('click', () => {
-      window.location.href = 'profile.html';
+      window.location.href = window.location.protocol === 'file:' ? 'profile.html' : 'profile';
     });
   }
 
@@ -479,7 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.removeItem('checklist-auth');
         localStorage.removeItem('dma_active_user');
       }
-      window.location.href = 'login.html';
+      window.location.href = window.location.protocol === 'file:' ? 'login.html' : 'login';
     });
   }
 
@@ -488,7 +488,8 @@ document.addEventListener('DOMContentLoaded', () => {
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       localStorage.setItem('checklist-auth', 'true');
-      window.location.href = form.dataset.redirect || 'app.html';
+      const redir = form.dataset.redirect || 'app';
+      window.location.href = window.location.protocol === 'file:' ? (redir.endsWith('.html') ? redir : `${redir}.html`) : redir.replace(/\.html$/i, '');
     });
   });
 
@@ -3411,8 +3412,9 @@ function restoreTradeDraft() {
 
 // Remember current active page route
 try {
-  const currentPath = window.location.pathname.split('/').pop() || 'index.html';
-  if (currentPath && currentPath !== 'login.html' && currentPath !== 'signup.html') {
+  let currentPath = window.location.pathname.split('/').pop() || 'index';
+  currentPath = currentPath.replace(/\.html$/i, '');
+  if (currentPath && currentPath !== 'login' && currentPath !== 'signup') {
     localStorage.setItem('dma_last_active_route', currentPath);
   }
 } catch (_) {}

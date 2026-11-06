@@ -125,7 +125,7 @@ function updateCloudSyncIndicator(status, message, details) {
     badge.classList.add('guest');
     badge.title = details || 'Guest Mode: Data saved to this phone only. Tap to Log In and sync to cloud.';
     if (text) text.textContent = message || 'Local Only (Sign In)';
-    badge.onclick = () => { window.location.href = 'login.html'; };
+    badge.onclick = () => { window.location.href = (window.location.protocol === 'file:' ? 'login.html' : 'login'); };
   } else if (status === 'offline') {
     badge.classList.add('offline');
     badge.title = details || 'Offline / Cloud Error: Will retry when connection is restored.';
@@ -368,7 +368,7 @@ const DMA_AUTH = {
         localStorage.setItem('dma_user', JSON.stringify(standardUser));
         localStorage.setItem('dma_active_user', JSON.stringify(standardUser));
 
-        window.location.href = 'app.html';
+        window.location.href = (window.location.protocol === 'file:' ? 'app.html' : 'app');
         return { data: { user: standardUser }, error: null };
       } catch (err) {
         console.warn('[DMA Firebase] Google sign-in popup error:', err);
@@ -406,7 +406,7 @@ const DMA_AUTH = {
     localStorage.setItem('checklist-auth', 'true');
     localStorage.setItem('dma_user', JSON.stringify(localUser));
     localStorage.setItem('dma_active_user', JSON.stringify(localUser));
-    window.location.href = 'app.html';
+    window.location.href = (window.location.protocol === 'file:' ? 'app.html' : 'app');
     return { data: { user: localUser }, error: null };
   },
 
@@ -424,7 +424,7 @@ const DMA_AUTH = {
       localStorage.removeItem('checklist-auth');
       localStorage.removeItem('dma_user');
       localStorage.removeItem('dma_active_user');
-      window.location.href = 'login.html';
+      window.location.href = (window.location.protocol === 'file:' ? 'login.html' : 'login');
     }
   },
 
@@ -832,10 +832,10 @@ if (auth && typeof getRedirectResult === 'function') {
         localStorage.setItem('dma_active_user', JSON.stringify(standardUser));
         updateCloudSyncIndicator('synced', 'Cloud Synced', 'Signed in as ' + result.user.email);
 
-        // If currently on login or signup, navigate directly to app.html
+        // If currently on login or signup, navigate directly to app
         const currentPath = (window.location.pathname || '').toLowerCase();
         if (currentPath.endsWith('login.html') || currentPath.endsWith('signup.html') || currentPath.includes('/login') || currentPath.includes('/signup')) {
-          window.location.replace('app.html');
+          window.location.replace(window.location.protocol === 'file:' ? 'app.html' : 'app');
         }
       }
     })
