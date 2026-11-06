@@ -9,6 +9,7 @@ import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebase
 import {
   getAuth,
   initializeAuth,
+  browserPopupRedirectResolver,
   indexedDBLocalPersistence,
   browserLocalPersistence,
   inMemoryPersistence,
@@ -62,7 +63,8 @@ try {
 if (app) {
   try {
     auth = initializeAuth(app, {
-      persistence: [indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence]
+      persistence: [indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence],
+      popupRedirectResolver: browserPopupRedirectResolver
     });
   } catch (initErr) {
     try {
@@ -190,6 +192,8 @@ function translateAuthError(err) {
       return 'Network connection error. Please check your internet connection.';
     case 'auth/too-many-requests':
       return 'Access to this account has been temporarily disabled due to many failed login attempts. Try again later.';
+    case 'auth/argument-error':
+      return 'Authentication configuration updating. Please refresh and try again.';
     default:
       return err.message || 'Authentication error. Please try again.';
   }
@@ -351,7 +355,7 @@ const DMA_AUTH = {
       if (this._isMobileOrPWA()) {
         try {
           console.info('[DMA Firebase] Mobile/PWA environment detected: initiating signInWithRedirect...');
-          await signInWithRedirect(auth, googleProvider);
+          await signInWithRedirect(auth, googleProvider, browserPopupRedirectResolver);
           return { redirecting: true };
         } catch (err) {
           console.warn('[DMA Firebase] signInWithRedirect error:', err);
@@ -361,7 +365,7 @@ const DMA_AUTH = {
 
       // 2. Desktop -> popup flow with automatic redirect fallback
       try {
-        const result = await signInWithPopup(auth, googleProvider);
+        const result = await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
         const standardUser = normalizeUser(result.user);
 
         localStorage.setItem('checklist-auth', 'true');
@@ -379,7 +383,7 @@ const DMA_AUTH = {
         if (code === 'auth/popup-blocked' || code === 'auth/cancelled-popup-request') {
           console.info('[DMA Firebase] Popup was blocked or cancelled. Falling back to signInWithRedirect...');
           try {
-            await signInWithRedirect(auth, googleProvider);
+            await signInWithRedirect(auth, googleProvider, browserPopupRedirectResolver);
             return { redirecting: true };
           } catch (redirectErr) {
             return { data: null, error: { message: translateAuthError(redirectErr), original: redirectErr } };
@@ -822,7 +826,7 @@ try {
 
 // Process pending Google redirect sign-in if returning from redirect flow
 if (auth && typeof getRedirectResult === 'function') {
-  getRedirectResult(auth)
+  getRedirectResult(auth, browserPopupRedirectResolver)
     .then((result) => {
       if (result && result.user) {
         console.info('[DMA Firebase] Successfully completed Google redirect sign-in for:', result.user.email);
@@ -840,12 +844,16 @@ if (auth && typeof getRedirectResult === 'function') {
       }
     })
     .catch((err) => {
-      console.warn('[DMA Firebase] getRedirectResult error:', err);
-      const alertBox = document.getElementById('auth-alert');
-      if (alertBox) {
-        alertBox.textContent = translateAuthError(err);
-        alertBox.className = 'auth-alert error';
-        alertBox.classList.remove('hidden');
+      console.warn('[DMA Firebase] getRedirectResult check:', err);
+      // Only display to user if it is a genuine auth error from an active redirect attempt
+      const code = err?.code || '';
+      if (code && code !== 'auth/argument-error' && code !== 'auth/null-user') {
+        const alertBox = document.getElementById('auth-alert');
+        if (alertBox) {
+          alertBox.textContent = translateAuthError(err);
+          alertBox.className = 'auth-alert error';
+          alertBox.classList.remove('hidden');
+        }
       }
     });
 }
