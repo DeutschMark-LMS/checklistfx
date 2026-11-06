@@ -4181,6 +4181,7 @@ if (checklistCreatorForm) {
       // EDIT MODE
       const targetId = currentEditingPlaybookId;
       const existing = playbookRegistry[targetId] || {};
+      existing.id = targetId;
       existing.name = name;
       existing.setupType = setupType;
       existing.targetRr = targetRr;

@@ -158,10 +158,9 @@ service cloud.firestore {
       return request.resource.data.keys().hasOnly(fields);
     }
 
-    // Ensure immutable fields are unchanged during update (only enforced if field existed in resource.data)
+    // Ensure immutable fields are unchanged during update
     function areImmutableFieldsUnchanged(fields) {
-      return !request.resource.data.diff(resource.data).changedKeys().hasAny(fields) &&
-        !request.resource.data.diff(resource.data).removedKeys().hasAny(fields);
+      return !request.resource.data.diff(resource.data).changedKeys().hasAny(fields);
     }
 
     // Validate string length within bounds
@@ -270,11 +269,11 @@ service cloud.firestore {
     // Validate Playbook Document
     function isValidPlaybook(data, userId) {
       let allowed = [
-        'id', 'name', 'setupType', 'targetRr', 'targetRR', 'confluences', 'thesis',
+        'id', 'key', 'name', 'setupType', 'targetRr', 'targetRR', 'confluences', 'thesis',
         'wr', 'tradesCount', 'followedWR', 'brokenWR', 'pnl',
         'timeframe', 'isSample', 'date', 'timestamp', 'notes', 'order',
         'followedBar', 'brokenBar', 'followedMeta', 'brokenMeta', 'multiplier',
-        'potentialPnl', 'actualPnl', 'svgFollowed', 'svgActual',
+        'potentialPnl', 'actualPnl', 'svgFollowed', 'svgActual', 'tags', 'status', 'description',
         'createdAt', 'updatedAt', 'userId', 'uid', 'ownerId'
       ];
       return data.keys().hasOnly(allowed) &&

@@ -600,8 +600,9 @@ const DMA_DB = {
     if (user && db) {
       try {
         updateCloudSyncIndicator('syncing', 'Syncing...');
+        const playbookId = String(playbook.id || playbook.key || 'custom_' + Date.now());
         const cleanPb = {
-          id: String(playbook.id),
+          id: playbookId,
           name: String(playbook.name || '').trim(),
           setupType: String(playbook.setupType || 'reversal').trim(),
           confluences: Array.isArray(playbook.confluences) ? playbook.confluences : [],
@@ -615,7 +616,10 @@ const DMA_DB = {
           userId: user.uid,
           updatedAt: Date.now()
         };
-        const pbRef = doc(db, 'users', user.uid, 'playbooks', String(playbook.id));
+        if (playbook.createdAt) {
+          cleanPb.createdAt = playbook.createdAt;
+        }
+        const pbRef = doc(db, 'users', user.uid, 'playbooks', playbookId);
         await setDoc(pbRef, cleanPb, { merge: true });
         cloudSaved = true;
         updateCloudSyncIndicator('synced', 'Cloud Synced');
