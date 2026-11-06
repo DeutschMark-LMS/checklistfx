@@ -521,6 +521,7 @@ const DMA_DB = {
         updateCloudSyncIndicator('synced', 'Cloud Synced');
       } catch (err) {
         cloudError = err;
+        window.__lastSyncError = err;
         console.error('[DMA Firestore] Error saving trade to cloud:', err);
         updateCloudSyncIndicator('offline', 'Sync Error');
       }
@@ -625,6 +626,7 @@ const DMA_DB = {
         updateCloudSyncIndicator('synced', 'Cloud Synced');
       } catch (err) {
         cloudError = err;
+        window.__lastSyncError = err;
         console.error('[DMA Firestore] Error saving playbook to cloud:', err);
         updateCloudSyncIndicator('offline', 'Sync Error');
       }
@@ -786,6 +788,7 @@ const DMA_DB = {
       // Dispatch event to refresh app views
       window.dispatchEvent(new CustomEvent('dma-data-synced'));
     } catch (err) {
+      window.__lastSyncError = err;
       console.warn('[DMA Firestore] Sync error:', err);
       updateCloudSyncIndicator('offline', 'Sync Error');
     }
