@@ -6711,6 +6711,18 @@ body.filter-open .filter-sheet {
   animation: none;
 }
 
+.cloud-sync-badge.local {
+  background: rgba(56, 189, 248, 0.08);
+  border-color: rgba(56, 189, 248, 0.25);
+  color: #38bdf8;
+  cursor: pointer;
+}
+.cloud-sync-badge.local .cloud-sync-dot {
+  background: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+  animation: none;
+}
+
 .cloud-sync-badge.syncing {
   background: rgba(245, 158, 11, 0.08);
   border-color: rgba(245, 158, 11, 0.25);

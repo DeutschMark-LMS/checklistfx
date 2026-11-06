@@ -15,6 +15,8 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   signOut as fbSignOut,
   sendPasswordResetEmail,
@@ -59,15 +61,14 @@ try {
 
 if (app) {
   try {
-    auth = getAuth(app);
-  } catch (authErr) {
-    console.warn('[DMA Firebase] getAuth default failed, attempting initializeAuth with multi-tier persistence:', authErr);
+    auth = initializeAuth(app, {
+      persistence: [indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence]
+    });
+  } catch (initErr) {
     try {
-      auth = initializeAuth(app, {
-        persistence: [indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence]
-      });
-    } catch (authErr2) {
-      console.warn('[DMA Firebase] initializeAuth fallback error:', authErr2);
+      auth = getAuth(app);
+    } catch (getAuthErr) {
+      console.warn('[DMA Firebase] Auth initialization warning:', getAuthErr);
     }
   }
 
@@ -93,7 +94,7 @@ function updateCloudSyncIndicator(status, message, details) {
   const text = document.getElementById('cloud-sync-text');
   if (!badge) return;
 
-  badge.classList.remove('syncing', 'guest', 'offline');
+  badge.classList.remove('syncing', 'guest', 'offline', 'local');
 
   if (status === 'synced') {
     badge.title = details || 'Firebase Firestore Cloud Connected';
@@ -104,6 +105,22 @@ function updateCloudSyncIndicator(status, message, details) {
     badge.title = details || 'Synchronizing with Cloud Firestore...';
     if (text) text.textContent = message || 'Syncing...';
     badge.onclick = null;
+  } else if (status === 'local') {
+    badge.classList.add('local');
+    badge.title = details || 'Device Storage: Changes saved to this device. Tap to view profile & cloud options.';
+    if (text) text.textContent = message || 'Device Synced';
+    badge.onclick = () => {
+      const openBtn = document.querySelector('[data-action="open-profile-editor"]');
+      if (openBtn) {
+        openBtn.click();
+      } else if (typeof window.showAppToast === 'function') {
+        window.showAppToast({
+          title: 'Device Synced',
+          message: details || 'Your trade and playbook changes are stored on this device.',
+          type: 'info'
+        });
+      }
+    };
   } else if (status === 'guest') {
     badge.classList.add('guest');
     badge.title = details || 'Guest Mode: Data saved to this phone only. Tap to Log In and sync to cloud.';
@@ -145,6 +162,7 @@ function normalizeUser(fbUser, customName) {
 function translateAuthError(err) {
   if (!err) return 'An unknown error occurred.';
   const code = err.code || '';
+  const domain = (typeof window !== 'undefined' && window.location) ? window.location.hostname : 'current domain';
   switch (code) {
     case 'auth/invalid-credential':
     case 'auth/wrong-password':
@@ -158,12 +176,20 @@ function translateAuthError(err) {
       return 'Password should be at least 6 characters.';
     case 'auth/popup-closed-by-user':
       return 'Google sign-in popup was closed before finishing.';
+    case 'auth/popup-blocked':
+      return 'Browser blocked the sign-in popup. Switching to redirect login...';
+    case 'auth/cancelled-popup-request':
+      return 'Only one sign-in request can be processed at a time.';
+    case 'auth/account-exists-with-different-credential':
+      return 'An account with this email already exists with a different sign-in method. Please sign in with email and password.';
+    case 'auth/operation-not-allowed':
+      return 'Google sign-in is not enabled in Firebase Console. Please enable "Google" under Firebase Console > Authentication > Sign-in method.';
+    case 'auth/unauthorized-domain':
+      return `Domain "${domain}" is not authorized. Please add "${domain}" in Firebase Console > Authentication > Settings > Authorized domains.`;
     case 'auth/network-request-failed':
       return 'Network connection error. Please check your internet connection.';
     case 'auth/too-many-requests':
       return 'Access to this account has been temporarily disabled due to many failed login attempts. Try again later.';
-    case 'auth/unauthorized-domain':
-      return 'This domain is not authorized in Firebase Console (Authentication > Settings > Authorized domains).';
     default:
       return err.message || 'Authentication error. Please try again.';
   }
@@ -222,6 +248,16 @@ const DMA_AUTH = {
       return { data: { user: standardUser }, error: null };
     } catch (err) {
       console.warn('[DMA Firebase] Sign up error:', err);
+      if (err.code === 'auth/email-already-in-use') {
+        try {
+          const cred = await signInWithEmailAndPassword(auth, email, password);
+          const standardUser = normalizeUser(cred.user, fullName);
+          localStorage.setItem('checklist-auth', 'true');
+          localStorage.setItem('dma_user', JSON.stringify(standardUser));
+          localStorage.setItem('dma_active_user', JSON.stringify(standardUser));
+          return { data: { user: standardUser }, error: null };
+        } catch (_) {}
+      }
       return { data: null, error: { message: translateAuthError(err), original: err } };
     }
   },
@@ -265,15 +301,65 @@ const DMA_AUTH = {
       return { data: { user: standardUser }, error: null };
     } catch (err) {
       console.warn('[DMA Firebase] Sign in error:', err);
+      // If user account is not found or credential invalid, attempt seamless registration so traders are never stranded
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found') {
+        try {
+          const newCred = await createUserWithEmailAndPassword(auth, email, password);
+          const localUser = DMA_AUTH.getUser();
+          const fullName = localUser?.user_metadata?.full_name || (email ? email.split('@')[0] : 'Trader');
+          try {
+            await updateProfile(newCred.user, { displayName: fullName });
+          } catch (_) {}
+          const standardUser = normalizeUser(newCred.user, fullName);
+          localStorage.setItem('checklist-auth', 'true');
+          localStorage.setItem('dma_user', JSON.stringify(standardUser));
+          localStorage.setItem('dma_active_user', JSON.stringify(standardUser));
+          return { data: { user: standardUser }, error: null };
+        } catch (createErr) {
+          if (createErr.code === 'auth/email-already-in-use') {
+            // Account definitely exists in Firebase, which means the entered password was incorrect
+            return { data: null, error: { message: 'Incorrect password for this email. Please check your password or use "Forgot password?".', original: err } };
+          }
+          if (createErr.code === 'auth/weak-password') {
+            return { data: null, error: { message: 'Password should be at least 6 characters.', original: createErr } };
+          }
+        }
+      }
       return { data: null, error: { message: translateAuthError(err), original: err } };
     }
   },
 
   /**
-   * Sign In with Google Popup
+   * Helper to detect mobile browser or standalone PWA
+   */
+  _isMobileOrPWA() {
+    if (typeof window === 'undefined') return false;
+    const ua = navigator.userAgent || '';
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+    return isMobile || isStandalone;
+  },
+
+  /**
+   * Sign In with Google
+   * - Mobile / PWA: Uses signInWithRedirect to bypass aggressive popup blockers & webview window limits.
+   * - Desktop: Attempts signInWithPopup first; automatically falls back to signInWithRedirect if popup is blocked.
    */
   async signInWithGoogle() {
     if (auth && googleProvider) {
+      // 1. Mobile or Standalone PWA -> redirect flow directly
+      if (this._isMobileOrPWA()) {
+        try {
+          console.info('[DMA Firebase] Mobile/PWA environment detected: initiating signInWithRedirect...');
+          await signInWithRedirect(auth, googleProvider);
+          return { redirecting: true };
+        } catch (err) {
+          console.warn('[DMA Firebase] signInWithRedirect error:', err);
+          return { data: null, error: { message: translateAuthError(err), original: err } };
+        }
+      }
+
+      // 2. Desktop -> popup flow with automatic redirect fallback
       try {
         const result = await signInWithPopup(auth, googleProvider);
         const standardUser = normalizeUser(result.user);
@@ -290,25 +376,14 @@ const DMA_AUTH = {
         if (code === 'auth/popup-closed-by-user') {
           return { data: null, error: { message: 'Google sign-in popup was closed before completing.' } };
         }
-        if (code === 'auth/unauthorized-domain' || code === 'auth/operation-not-supported-in-this-environment') {
-          console.info('[DMA Firebase] Domain not authorized or file protocol detected; activating local Google session.');
-          const fallbackUser = {
-            id: 'google-usr-' + Date.now(),
-            uid: 'google-usr-' + Date.now(),
-            email: 'trader.google@gmail.com',
-            user_metadata: {
-              full_name: 'Google Trader',
-              handle: '@googletrader',
-              trading_style: 'Momentum + Breakout'
-            },
-            displayName: 'Google Trader',
-            photoURL: null
-          };
-          localStorage.setItem('checklist-auth', 'true');
-          localStorage.setItem('dma_user', JSON.stringify(fallbackUser));
-          localStorage.setItem('dma_active_user', JSON.stringify(fallbackUser));
-          window.location.href = 'app.html';
-          return { data: { user: fallbackUser }, error: null };
+        if (code === 'auth/popup-blocked' || code === 'auth/cancelled-popup-request') {
+          console.info('[DMA Firebase] Popup was blocked or cancelled. Falling back to signInWithRedirect...');
+          try {
+            await signInWithRedirect(auth, googleProvider);
+            return { redirecting: true };
+          } catch (redirectErr) {
+            return { data: null, error: { message: translateAuthError(redirectErr), original: redirectErr } };
+          }
         }
         return { data: null, error: { message: translateAuthError(err), original: err } };
       }
@@ -446,7 +521,12 @@ const DMA_DB = {
         updateCloudSyncIndicator('offline', 'Sync Error');
       }
     } else {
-      updateCloudSyncIndicator('guest', 'Local Only (Sign In)');
+      const localUser = DMA_AUTH.getUser();
+      if (localUser && localStorage.getItem('checklist-auth') === 'true') {
+        updateCloudSyncIndicator('local', 'Device Synced');
+      } else {
+        updateCloudSyncIndicator('guest', 'Local Only (Sign In)');
+      }
     }
 
     // Also save to localStorage cache
@@ -541,7 +621,12 @@ const DMA_DB = {
         updateCloudSyncIndicator('offline', 'Sync Error');
       }
     } else {
-      updateCloudSyncIndicator('guest', 'Local Only (Sign In)');
+      const localUser = DMA_AUTH.getUser();
+      if (localUser && localStorage.getItem('checklist-auth') === 'true') {
+        updateCloudSyncIndicator('local', 'Device Synced');
+      } else {
+        updateCloudSyncIndicator('guest', 'Local Only (Sign In)');
+      }
     }
 
     // Also save to localStorage
@@ -724,6 +809,47 @@ window.DMA_DB = DMA_DB;
 window.firebaseAuth = auth;
 window.firebaseDb = db;
 
+// Initial immediate UI state from localStorage cache
+try {
+  const cachedUser = DMA_AUTH.getUser();
+  const cachedAuth = localStorage.getItem('checklist-auth') === 'true';
+  if (cachedUser && cachedAuth) {
+    updateCloudSyncIndicator('local', 'Device Synced', 'Signed in as ' + (cachedUser.email || cachedUser.user_metadata?.full_name || 'Trader') + ' (Device Storage)');
+  } else {
+    updateCloudSyncIndicator('guest', 'Local Only (Sign In)');
+  }
+} catch (_) {}
+
+// Process pending Google redirect sign-in if returning from redirect flow
+if (auth && typeof getRedirectResult === 'function') {
+  getRedirectResult(auth)
+    .then((result) => {
+      if (result && result.user) {
+        console.info('[DMA Firebase] Successfully completed Google redirect sign-in for:', result.user.email);
+        const standardUser = normalizeUser(result.user);
+        localStorage.setItem('checklist-auth', 'true');
+        localStorage.setItem('dma_user', JSON.stringify(standardUser));
+        localStorage.setItem('dma_active_user', JSON.stringify(standardUser));
+        updateCloudSyncIndicator('synced', 'Cloud Synced', 'Signed in as ' + result.user.email);
+
+        // If currently on login or signup, navigate directly to app.html
+        const currentPath = (window.location.pathname || '').toLowerCase();
+        if (currentPath.endsWith('login.html') || currentPath.endsWith('signup.html') || currentPath.includes('/login') || currentPath.includes('/signup')) {
+          window.location.replace('app.html');
+        }
+      }
+    })
+    .catch((err) => {
+      console.warn('[DMA Firebase] getRedirectResult error:', err);
+      const alertBox = document.getElementById('auth-alert');
+      if (alertBox) {
+        alertBox.textContent = translateAuthError(err);
+        alertBox.className = 'auth-alert error';
+        alertBox.classList.remove('hidden');
+      }
+    });
+}
+
 // Real-time auth sync
 if (auth) {
   onAuthStateChanged(auth, async (user) => {
@@ -753,7 +879,14 @@ if (auth) {
         window.dispatchEvent(new CustomEvent('dma-auth-changed', { detail: standardUser }));
       } catch (_) {}
     } else {
-      updateCloudSyncIndicator('guest', 'Local Only (Sign In)');
+      const localUser = DMA_AUTH.getUser();
+      const isAuthFlag = localStorage.getItem('checklist-auth') === 'true';
+
+      if (localUser && isAuthFlag) {
+        updateCloudSyncIndicator('local', 'Device Synced', 'Signed in as ' + (localUser.email || localUser.user_metadata?.full_name || 'Trader') + ' (Local Device Storage)');
+      } else {
+        updateCloudSyncIndicator('guest', 'Local Only (Sign In)');
+      }
     }
   });
 }

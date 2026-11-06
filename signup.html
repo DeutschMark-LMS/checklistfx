@@ -148,6 +148,15 @@
 
           setLoading(true);
 
+          // Wait for window.DMA_AUTH if it's still initializing
+          if (!window.DMA_AUTH) {
+            let waits = 0;
+            while (!window.DMA_AUTH && waits < 25) {
+              await new Promise(r => setTimeout(r, 100));
+              waits++;
+            }
+          }
+
           if (window.DMA_AUTH) {
             const { data, error } = await window.DMA_AUTH.signUp({ email, password, fullName });
             setLoading(false);
@@ -162,10 +171,10 @@
                 localStorage.setItem('dma_trades', '[]');
                 localStorage.setItem('dma_custom_playbooks', '[]');
                 localStorage.setItem('dma_deleted_playbooks', '[]');
-                showAlert('Account created successfully! Redirecting...', 'success');
+                showAlert('Account created successfully! Connecting cloud session...', 'success');
                 setTimeout(() => {
                   window.location.href = 'app.html';
-                }, 400);
+                }, 600);
               } else {
                 showAlert('Account created! Please check your email or log in.', 'success');
                 signupForm.reset();
@@ -184,7 +193,8 @@
       }
 
       if (googleBtn) {
-        googleBtn.addEventListener('click', async () => {
+        googleBtn.addEventListener('click', async (e) => {
+          e.preventDefault();
           showAlert('Connecting to Google...', 'info');
           // Ensure fresh user starts with clean slate (empty trades & playbooks)
           localStorage.removeItem('dma_include_sample_data');
@@ -192,21 +202,36 @@
           localStorage.setItem('dma_custom_playbooks', '[]');
           localStorage.setItem('dma_deleted_playbooks', '[]');
 
-          if (window.DMA_AUTH) {
-            const res = await window.DMA_AUTH.signInWithGoogle();
-            if (res && res.error) {
-              showAlert(res.error.message || 'Google sign-up was cancelled or failed.', 'error');
+          const executeGoogleSignUp = async () => {
+            if (window.DMA_AUTH) {
+              const res = await window.DMA_AUTH.signInWithGoogle();
+              if (res && res.redirecting) {
+                showAlert('Redirecting to Google secure authentication...', 'info');
+              } else if (res && res.error) {
+                showAlert(res.error.message || 'Google sign-up was cancelled or failed.', 'error');
+              }
+            } else {
+              const mockUser = {
+                id: 'google-usr-' + Date.now(),
+                email: 'trader.google@gmail.com',
+                user_metadata: { full_name: 'Google Trader', handle: '@googletrader', trading_style: 'Momentum + Breakout' }
+              };
+              localStorage.setItem('checklist-auth', 'true');
+              localStorage.setItem('dma_user', JSON.stringify(mockUser));
+              localStorage.setItem('dma_active_user', JSON.stringify(mockUser));
+              window.location.href = 'app.html';
             }
+          };
+
+          if (window.DMA_AUTH) {
+            executeGoogleSignUp();
           } else {
-            const mockUser = {
-              id: 'google-usr-' + Date.now(),
-              email: 'trader.google@gmail.com',
-              user_metadata: { full_name: 'Google Trader', handle: '@googletrader', trading_style: 'Momentum + Breakout' }
-            };
-            localStorage.setItem('checklist-auth', 'true');
-            localStorage.setItem('dma_user', JSON.stringify(mockUser));
-            localStorage.setItem('dma_active_user', JSON.stringify(mockUser));
-            window.location.href = 'app.html';
+            let waits = 0;
+            while (!window.DMA_AUTH && waits < 15) {
+              await new Promise(r => setTimeout(r, 80));
+              waits++;
+            }
+            executeGoogleSignUp();
           }
         });
       }
