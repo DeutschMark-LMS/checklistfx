@@ -4224,11 +4224,15 @@ if (checklistCreatorForm) {
               duration: 4000
             });
           } else if (res && res.error) {
+            const errCode = res.error.code || '';
+            const isPerm = errCode === 'permission-denied';
             showAppToast({
-              title: 'Playbook Updated Locally',
-              message: `Cloud sync pending (${res.error.message || 'Network'}). Saved to this device.`,
+              title: isPerm ? 'Cloud Permissions Error' : 'Playbook Updated Locally',
+              message: isPerm
+                ? 'Firestore Security Rules rejected write. Please publish rules in Firebase Console.\nSaved to this device.'
+                : `Cloud sync pending (${res.error.message || 'Network'}). Saved to this device.`,
               type: 'warning',
-              duration: 4500
+              duration: 6000
             });
           }
         }).catch(err => console.warn('Firestore update error', err));
@@ -4299,11 +4303,15 @@ if (checklistCreatorForm) {
             duration: 4500
           });
         } else if (res && res.error) {
+          const errCode = res.error.code || '';
+          const isPerm = errCode === 'permission-denied';
           showAppToast({
-            title: 'New Playbook Saved (Local Cache)',
-            message: `"${name}" is saved on this device. Cloud sync pending (${res.error.message || 'Permission/Network'}).`,
+            title: isPerm ? 'Cloud Permissions Error' : 'New Playbook Saved (Local Cache)',
+            message: isPerm
+              ? `"${name}" saved to device. Firestore Rules rejected cloud write. Check Firebase Console.`
+              : `"${name}" is saved on this device. Cloud sync pending (${res.error.message || 'Permission/Network'}).`,
             type: 'warning',
-            duration: 4500
+            duration: 6000
           });
         }
       }).catch(err => {

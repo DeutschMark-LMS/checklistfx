@@ -130,12 +130,57 @@ function updateCloudSyncIndicator(status, message, details) {
     badge.onclick = () => { window.location.href = (window.location.protocol === 'file:' ? 'login.html' : 'login'); };
   } else if (status === 'offline') {
     badge.classList.add('offline');
-    badge.title = details || 'Offline / Cloud Error: Will retry when connection is restored.';
-    if (text) text.textContent = message || 'Offline';
-    badge.onclick = null;
+    badge.title = details || 'Sync Error: Tap to view diagnostics.';
+    if (text) text.textContent = message || 'Sync Error';
+    badge.onclick = () => {
+      if (typeof window.diagnoseCloudSync === 'function') {
+        window.diagnoseCloudSync();
+      }
+    };
   }
 }
 window.updateCloudSyncIndicator = updateCloudSyncIndicator;
+
+/**
+ * Diagnostic helper to troubleshoot Firestore sync issues
+ */
+window.diagnoseCloudSync = async function() {
+  const user = auth?.currentUser;
+  const lines = ['[Checklist Fx Cloud Diagnostics]'];
+  if (user) {
+    lines.push(`Auth: Signed in as ${user.email}`);
+    lines.push(`UID: ${user.uid}`);
+  } else {
+    lines.push('Auth: NOT signed into Firebase Auth.');
+  }
+
+  const err = window.__lastSyncError;
+  if (err) {
+    lines.push(`Error Code: ${err.code || 'unknown'}`);
+    lines.push(`Message: ${err.message || 'unknown'}`);
+    if (err.code === 'permission-denied') {
+      lines.push('\nReason: Cloud Firestore Security Rules in Firebase Console are blocking access.');
+      lines.push('Fix: Go to Firebase Console -> Firestore Database -> Rules tab, and click Publish.');
+    } else if (err.code === 'not-found') {
+      lines.push('\nReason: Firestore Database "(default)" does not exist in Firebase Console project "dma-trading-checklist".');
+    }
+  } else {
+    lines.push('Status: No recent sync errors logged in this session.');
+  }
+
+  const msg = lines.join('\n');
+  console.info('[DMA Diagnostics]\n' + msg);
+  if (typeof window.showAppToast === 'function') {
+    window.showAppToast({
+      title: 'Cloud Diagnostics',
+      message: msg,
+      type: 'warning',
+      duration: 9000
+    });
+  } else {
+    alert(msg);
+  }
+};
 
 /**
  * Format Firebase user into standardized DMA user object
