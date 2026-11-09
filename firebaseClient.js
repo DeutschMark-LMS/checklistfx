@@ -221,8 +221,16 @@ window.diagnoseCloudSync = async function() {
  */
 function normalizeUser(fbUser, customName) {
   if (!fbUser) return null;
-  const displayName = customName || fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'Trader');
-  const handle = '@' + (fbUser.email ? fbUser.email.split('@')[0] : 'trader');
+  let savedPrefs = null;
+  try {
+    const raw = localStorage.getItem('dma_user_preferences');
+    if (raw) savedPrefs = JSON.parse(raw);
+  } catch (_) {}
+
+  const displayName = customName || savedPrefs?.name || fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'Trader');
+  const handle = savedPrefs?.handle || ('@' + (fbUser.email ? fbUser.email.split('@')[0] : 'trader'));
+  const tradingStyle = savedPrefs?.style || 'Momentum + Breakout';
+
   return {
     id: fbUser.uid,
     uid: fbUser.uid,
@@ -230,7 +238,7 @@ function normalizeUser(fbUser, customName) {
     user_metadata: {
       full_name: displayName,
       handle: handle,
-      trading_style: 'Momentum + Breakout'
+      trading_style: tradingStyle
     },
     displayName: displayName,
     photoURL: fbUser.photoURL || null
@@ -879,14 +887,69 @@ const DMA_DB = {
         });
       }
 
-      // 3. Sync Preferences (Timezone, Trading Style, Currency, Accounts)
+      // 3. Sync Preferences & Profile (Timezone, Trading Style, Currency, Accounts, Custom Name, Custom Handle)
       try {
-        if (uDoc && typeof uDoc.exists === 'function' && uDoc.exists() && uDoc.data().preferences) {
-          const userPrefs = uDoc.data().preferences;
-          localStorage.setItem('dma_user_preferences', JSON.stringify(userPrefs));
-          if (userPrefs.accounts && Array.isArray(userPrefs.accounts) && userPrefs.accounts.length > 0) {
-            localStorage.setItem('dma_trading_accounts', JSON.stringify(userPrefs.accounts));
+        if (uDoc && typeof uDoc.exists === 'function' && uDoc.exists()) {
+          const uData = uDoc.data() || {};
+          let userPrefs = uData.preferences || {};
+          // Preserve custom name & handle saved in cloud
+          if (uData.displayName && !userPrefs.name) userPrefs.name = uData.displayName;
+          if (uData.handle && !userPrefs.handle) userPrefs.handle = uData.handle;
+          if (uData.tradingStyle && !userPrefs.style) userPrefs.style = uData.tradingStyle;
+
+          if (Object.keys(userPrefs).length > 0) {
+            let currentLocal = {};
+            try {
+              currentLocal = JSON.parse(localStorage.getItem('dma_user_preferences') || '{}');
+            } catch (_) {}
+            const mergedPrefs = { ...currentLocal, ...userPrefs };
+            localStorage.setItem('dma_user_preferences', JSON.stringify(mergedPrefs));
+            if (mergedPrefs.accounts && Array.isArray(mergedPrefs.accounts) && mergedPrefs.accounts.length > 0) {
+              localStorage.setItem('dma_trading_accounts', JSON.stringify(mergedPrefs.accounts));
+            }
           }
+        } else if (uDoc && typeof uDoc.exists === 'function' && !uDoc.exists()) {
+          // Initialize fresh user profile doc in Cloud Firestore
+          const u = auth?.currentUser;
+          if (u) {
+            const initialData = {
+              uid: u.uid,
+              email: u.email || '',
+              displayName: u.displayName || (u.email ? u.email.split('@')[0] : 'Trader'),
+              handle: '@' + (u.email ? u.email.split('@')[0] : 'trader'),
+              tradingStyle: 'Momentum + Breakout',
+              createdAt: Date.now(),
+              updatedAt: Date.now()
+            };
+            setDoc(doc(db, 'users', u.uid), initialData, { merge: true }).catch(err => {
+              console.warn('[DMA Firestore] Error creating initial user profile doc:', err);
+            });
+          }
+        }
+      } catch (_) {}
+
+      // Synchronize active user cache and DOM with freshest synced preferences
+      try {
+        const u = auth?.currentUser;
+        if (u) {
+          const standardUser = normalizeUser(u);
+          localStorage.setItem('dma_user', JSON.stringify(standardUser));
+          localStorage.setItem('dma_active_user', JSON.stringify(standardUser));
+
+          document.querySelectorAll('#drawer-user-avatar, #profile-avatar').forEach(el => {
+            el.textContent = (standardUser.user_metadata.full_name || 'TR').slice(0, 2).toUpperCase();
+          });
+          document.querySelectorAll('#drawer-user-name, #profile-name-display').forEach(el => {
+            el.textContent = standardUser.user_metadata.full_name;
+          });
+          document.querySelectorAll('#drawer-user-email, #profile-email-display').forEach(el => {
+            el.textContent = standardUser.user_metadata.handle;
+          });
+
+          const inputName = document.getElementById('profile-name');
+          const inputHandle = document.getElementById('profile-handle');
+          if (inputName) inputName.value = standardUser.user_metadata.full_name;
+          if (inputHandle) inputHandle.value = standardUser.user_metadata.handle;
         }
       } catch (_) {}
 
@@ -894,6 +957,7 @@ const DMA_DB = {
 
       // Dispatch event to refresh app views
       window.dispatchEvent(new CustomEvent('dma-data-synced'));
+      window.dispatchEvent(new CustomEvent('dma-preferences-updated'));
     } catch (err) {
       window.__lastSyncError = err;
       console.warn('[DMA Firestore] Sync error:', err);
@@ -909,12 +973,47 @@ const DMA_DB = {
     if (user && db) {
       try {
         const userRef = doc(db, 'users', user.uid);
-        await setDoc(userRef, { preferences: prefs }, { merge: true });
+        await setDoc(userRef, {
+          preferences: prefs,
+          displayName: prefs.name || user.displayName || '',
+          handle: prefs.handle || '',
+          tradingStyle: prefs.style || 'Momentum + Breakout',
+          updatedAt: Date.now()
+        }, { merge: true });
+
+        if (typeof updateProfile === 'function' && prefs.name && prefs.name !== user.displayName) {
+          try {
+            await updateProfile(user, { displayName: prefs.name });
+          } catch (e) {
+            console.warn('[DMA Firebase] updateProfile error:', e);
+          }
+        }
       } catch (err) {
         console.warn('[DMA Firestore] Error saving preferences:', err);
       }
     }
     localStorage.setItem('dma_user_preferences', JSON.stringify(prefs));
+
+    // Keep active user caches in sync
+    try {
+      const storedUser = JSON.parse(localStorage.getItem('dma_active_user') || localStorage.getItem('dma_user') || 'null');
+      if (storedUser && typeof storedUser === 'object') {
+        if (!storedUser.user_metadata) storedUser.user_metadata = {};
+        if (prefs.name) {
+          storedUser.displayName = prefs.name;
+          storedUser.user_metadata.full_name = prefs.name;
+        }
+        if (prefs.handle) {
+          storedUser.user_metadata.handle = prefs.handle;
+        }
+        if (prefs.style) {
+          storedUser.user_metadata.trading_style = prefs.style;
+        }
+        localStorage.setItem('dma_user', JSON.stringify(storedUser));
+        localStorage.setItem('dma_active_user', JSON.stringify(storedUser));
+      }
+    } catch (_) {}
+
     return prefs;
   }
 };

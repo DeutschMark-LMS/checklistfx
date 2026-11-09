@@ -246,10 +246,25 @@ window.alert = function(msg) {
 // GLOBAL USER PREFERENCES & PERSISTENCE
 // ==========================================================================
 function getUserPreferences() {
+  let stored = {};
   try {
     const raw = localStorage.getItem('dma_user_preferences');
-    if (raw) return JSON.parse(raw);
+    if (raw) stored = JSON.parse(raw) || {};
   } catch (_) {}
+
+  let authUser = null;
+  if (typeof window.DMA_AUTH !== 'undefined' && typeof window.DMA_AUTH.getUser === 'function') {
+    authUser = window.DMA_AUTH.getUser();
+  }
+  if (!authUser) {
+    try {
+      authUser = JSON.parse(localStorage.getItem('dma_active_user') || localStorage.getItem('dma_user') || 'null');
+    } catch (_) {}
+  }
+
+  const email = authUser?.email || '';
+  const defaultName = authUser?.displayName || authUser?.user_metadata?.full_name || (email ? email.split('@')[0] : 'Trader');
+  const defaultHandle = authUser?.user_metadata?.handle || (email ? ('@' + email.split('@')[0]) : '@trader');
 
   let detectedTz = 'Africa/Lagos';
   try {
@@ -258,16 +273,16 @@ function getUserPreferences() {
   } catch (_) {}
 
   return {
-    name: 'Jason Trader',
-    handle: '@jasondma',
-    timezone: detectedTz,
-    style: 'Momentum + Breakout',
-    currency: 'USD',
-    accountSize: 100000,
-    riskPerTrade: 1.0,
-    notifications: true,
-    darkMode: true,
-    riskReminders: true
+    name: stored.name || defaultName,
+    handle: stored.handle || defaultHandle,
+    timezone: stored.timezone || detectedTz,
+    style: stored.style || 'Momentum + Breakout',
+    currency: stored.currency || 'USD',
+    accountSize: stored.accountSize || 100000,
+    riskPerTrade: stored.riskPerTrade || 1.0,
+    notifications: stored.notifications !== undefined ? stored.notifications : true,
+    darkMode: stored.darkMode !== undefined ? stored.darkMode : true,
+    riskReminders: stored.riskReminders !== undefined ? stored.riskReminders : true
   };
 }
 window.getUserPreferences = getUserPreferences;
@@ -418,6 +433,27 @@ function saveUserPreferences(prefs) {
     const current = getUserPreferences();
     const updated = { ...current, ...prefs };
     localStorage.setItem('dma_user_preferences', JSON.stringify(updated));
+
+    // Keep active user caches synchronized immediately
+    try {
+      const storedUser = JSON.parse(localStorage.getItem('dma_active_user') || localStorage.getItem('dma_user') || 'null');
+      if (storedUser && typeof storedUser === 'object') {
+        if (!storedUser.user_metadata) storedUser.user_metadata = {};
+        if (updated.name) {
+          storedUser.displayName = updated.name;
+          storedUser.user_metadata.full_name = updated.name;
+        }
+        if (updated.handle) {
+          storedUser.user_metadata.handle = updated.handle;
+        }
+        if (updated.style) {
+          storedUser.user_metadata.trading_style = updated.style;
+        }
+        localStorage.setItem('dma_user', JSON.stringify(storedUser));
+        localStorage.setItem('dma_active_user', JSON.stringify(storedUser));
+      }
+    } catch (_) {}
+
     if (window.DMA_DB && typeof window.DMA_DB.savePreferences === 'function') {
       window.DMA_DB.savePreferences(updated);
     }
@@ -631,9 +667,9 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (_) {}
     }
 
-    const email = user?.email || 'trader@dma.com';
-    const name = prefs.name || user?.user_metadata?.full_name || email.split('@')[0] || 'Trader';
-    const handle = prefs.handle || user?.user_metadata?.handle || ('@' + email.split('@')[0]);
+    const email = user?.email || '';
+    const name = prefs.name || user?.user_metadata?.full_name || user?.displayName || (email ? email.split('@')[0] : 'Trader');
+    const handle = prefs.handle || user?.user_metadata?.handle || (email ? ('@' + email.split('@')[0]) : '@trader');
     const timezone = prefs.timezone || 'America/New_York';
     const style = prefs.style || 'Momentum + Breakout';
     const initials = name.slice(0, 2).toUpperCase();
@@ -760,8 +796,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const saveProfileButton = document.querySelector('[data-action="save-profile-editor"]');
   if (saveProfileButton) {
     saveProfileButton.addEventListener('click', () => {
-      const nextName = document.getElementById('profile-name')?.value.trim() || 'Jason Trader';
-      const rawHandle = document.getElementById('profile-handle')?.value.trim() || '@jasondma';
+      const currentPrefs = getUserPreferences();
+      const nextName = document.getElementById('profile-name')?.value.trim() || currentPrefs.name || 'Trader';
+      const rawHandle = document.getElementById('profile-handle')?.value.trim() || currentPrefs.handle || '@trader';
       const nextHandle = rawHandle.startsWith('@') ? rawHandle : '@' + rawHandle;
       const nextTimezone = document.getElementById('profile-timezone')?.value || 'Africa/Lagos';
       const nextStyle = document.getElementById('profile-style')?.value || 'Momentum + Breakout';

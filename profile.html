@@ -17,14 +17,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="style.css?v=v3.4">
+  <link rel="stylesheet" href="style.css?v=v3.5">
   <!-- Universal URL Resolver for Localhost, Live Server, GitHub Pages & Vercel -->
   <script>
     (function(){function r(e){if(!e)return"";if(e.startsWith("http://")||e.startsWith("https://")||e.startsWith("mailto:")||e.startsWith("#"))return e;const t=e.split("?")[0].split("#")[0],s=e.includes("?")?"?"+e.split("?")[1].split("#")[0]:"",n=e.includes("#")?"#"+e.split("#")[1]:"";let o=t.split("/").filter(Boolean).pop()||"";o=o.toLowerCase().replace(/\.html$/i,""),("index"===o||"/"===t||""===t)&&(o="");const l="file:"===window.location.protocol,a=window.location.hostname||"",i="localhost"===a||"127.0.0.1"===a||"0.0.0.0"===a||a.endsWith(".local"),c=a.endsWith("github.io"),h=window.location.pathname.toLowerCase().endsWith(".html"),d=l||i||c||h;if(l)return(o?`${o}.html`:"index.html")+s+n;const p=new URL(window.location.href),u=p.pathname.replace(/\/+$/,"").replace(/\/[^/]*$/,"")||"",w=d?o?`/${o}.html`:"/index.html":o?`/${o}`:"/";return`${p.origin}${u}${w}${s}${n}`}function n(e,t=!1){const s=r(e);if(s){if(e.startsWith("http://")||e.startsWith("https://")||e.startsWith("mailto:")||e.startsWith("#"))return void(t?window.location.replace(s):window.location.href=s);const n=new URL(window.location.href),o=new URL(s,window.location.href),l=n.pathname.replace(/\.html$/i,"").replace(/\/+$/,"")||"/",a=o.pathname.replace(/\.html$/i,"").replace(/\/+$/,"")||"/";if(l===a&&n.origin===o.origin&&(!o.hash||o.hash===n.hash))return void document.body.classList.remove("nav-open");t?window.location.replace(s):window.location.href=s}}window.resolveRouteUrl=r,window.DMA_NAVIGATE=n})();
   </script>
   <!-- Firebase Auth SDK (v12) -->
-  <script type="module" src="firebaseClient.js?v=v3.3"></script>
-  <script src="app.js?v=v3.4" defer></script>
+  <script type="module" src="firebaseClient.js?v=v3.5"></script>
+  <script src="app.js?v=v3.5" defer></script>
   <script src="guardian.js?v=v3.3" defer></script>
 </head>
 <body class="app-body profile-page">
@@ -54,8 +54,8 @@
     <section class="profile-card">
       <div class="profile-avatar" id="profile-avatar">TR</div>
       <div class="profile-meta">
-        <h2 id="profile-name-display">Jason Trader</h2>
-        <p id="profile-email-display">@jasondma</p>
+        <h2 id="profile-name-display">Trader</h2>
+        <p id="profile-email-display">@trader</p>
         <div style="margin-top: 0.35rem;">
           <span class="profile-style-pill" id="profile-style-badge">Momentum + Breakout</span>
         </div>
@@ -190,50 +190,6 @@
     <button type="button" class="btn btn-ghost btn-block profile-logout" id="profile-logout-btn" style="margin-top: 1rem; color: var(--danger); border-color: rgba(244, 63, 94, 0.3); width: 100%; cursor: pointer;">Log out</button>
   </main>
 
-  <script>
-    document.addEventListener('DOMContentLoaded', async () => {
-      // 1. Load Supabase / Active User Profile
-      if (typeof window.DMA_AUTH !== 'undefined') {
-        const user = window.DMA_AUTH.getUser();
-        if (user) {
-          const email = user.email || 'trader@dma.com';
-          const name = user.user_metadata?.full_name || email.split('@')[0] || 'Trader';
-          const initials = name.slice(0, 2).toUpperCase();
-
-          const avatarEl = document.getElementById('profile-avatar');
-          const nameEl = document.getElementById('profile-name-display');
-          const emailEl = document.getElementById('profile-email-display');
-          const inputName = document.getElementById('profile-name');
-          const inputHandle = document.getElementById('profile-handle');
-
-          if (avatarEl) avatarEl.textContent = initials;
-          if (nameEl) nameEl.textContent = name;
-          if (emailEl) emailEl.textContent = user.user_metadata?.handle ? '@' + user.user_metadata.handle : email;
-          if (inputName) inputName.value = name;
-          if (inputHandle) inputHandle.value = user.user_metadata?.handle || ('@' + email.split('@')[0]);
-        }
-
-        // 3. Handle Logout
-        const logoutBtn = document.getElementById('profile-logout-btn');
-        if (logoutBtn) {
-          logoutBtn.addEventListener('click', async (e) => {
-            e.preventDefault();
-            logoutBtn.disabled = true;
-            logoutBtn.textContent = 'Logging out...';
-            await window.DMA_AUTH.signOut();
-            if (typeof window.DMA_NAVIGATE === 'function') {
-              window.DMA_NAVIGATE('login');
-            } else if (typeof window.resolveRouteUrl === 'function') {
-              window.location.href = window.resolveRouteUrl('login');
-            } else {
-              window.location.href = 'login.html';
-            }
-          });
-        }
-      }
-    });
-  </script>
-
   <div class="profile-modal hidden" id="profile-modal" aria-hidden="true">
     <div class="profile-modal-card">
       <div class="modal-header">
@@ -245,12 +201,12 @@
 
       <div class="form-group">
         <label for="profile-name">Display name</label>
-        <input id="profile-name" type="text" value="Jason Trader">
+        <input id="profile-name" type="text" placeholder="Your name">
       </div>
 
       <div class="form-group">
         <label for="profile-handle">Handle</label>
-        <input id="profile-handle" type="text" value="@jasondma">
+        <input id="profile-handle" type="text" placeholder="@yourhandle">
       </div>
 
       <div class="form-group">
