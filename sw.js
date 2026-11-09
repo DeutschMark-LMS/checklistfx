@@ -1,8 +1,8 @@
-// Checklist Fx High-Performance Service Worker (v6)
+// Checklist Fx High-Performance Service Worker (v7)
 // Implements Stale-While-Revalidate for app shell, Cache-First for Google Fonts,
 // extensionless path resolution to .html assets, and Network-Only pass-through for Firebase Firestore/Auth.
 
-const CACHE_NAME = 'checklistfx-pwa-v6';
+const CACHE_NAME = 'checklistfx-pwa-v7';
 const FONT_CACHE_NAME = 'checklistfx-fonts-v1';
 
 const PRECACHE_SHELL = [
@@ -27,19 +27,18 @@ const PRECACHE_SHELL = [
   './icons/apple-touch-icon.png'
 ];
 
-// Helper to resolve an extensionless URL to its matching .html shell asset
+// Helper to resolve an extensionless or .html URL to its matching precached .html shell asset
 function getMatchingHtmlPath(urlStr) {
   try {
     const u = new URL(urlStr);
-    const lastSeg = u.pathname.split('/').filter(Boolean).pop() || '';
-    if (lastSeg && !lastSeg.includes('.')) {
-      const known = ['app', 'journal', 'playbook', 'analytics', 'profile', 'login', 'signup', 'index'];
-      if (known.includes(lastSeg.toLowerCase())) {
-        return `./${lastSeg.toLowerCase()}.html`;
-      }
+    let lastSeg = u.pathname.split('/').filter(Boolean).pop() || 'index';
+    lastSeg = lastSeg.toLowerCase().replace(/\.html$/i, '');
+    const known = ['app', 'journal', 'playbook', 'analytics', 'profile', 'login', 'signup', 'index'];
+    if (known.includes(lastSeg)) {
+      return `./${lastSeg}.html`;
     }
   } catch (_) {}
-  return null;
+  return './index.html';
 }
 
 // Install: precache essential shell assets
@@ -53,7 +52,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate: clean up old cache versions
+// Activate: clean up old cache versions immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -64,7 +63,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch: Stale-While-Revalidate for local files; Cache-First for Fonts; Network-Only for APIs
+// Fetch event
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
@@ -82,68 +81,89 @@ self.addEventListener('fetch', (event) => {
   // 2. Google Fonts: Cache-First strategy for instant, non-blocking typography
   if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
     event.respondWith(
-      caches.open(FONT_CACHE_NAME).then((fontCache) => {
-        return fontCache.match(event.request).then((cachedResponse) => {
-          if (cachedResponse) return cachedResponse;
-          return fetch(event.request).then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              fontCache.put(event.request, networkResponse.clone());
-            }
-            return networkResponse;
-          });
-        });
+      caches.open(FONT_CACHE_NAME).then(async (fontCache) => {
+        const cachedResponse = await fontCache.match(event.request);
+        if (cachedResponse) return cachedResponse;
+        try {
+          const networkResponse = await fetch(event.request);
+          if (networkResponse && networkResponse.status === 200) {
+            fontCache.put(event.request, networkResponse.clone());
+          }
+          return networkResponse;
+        } catch (_) {
+          return new Response('', { status: 408 });
+        }
       })
     );
     return;
   }
 
-  // 3. App Shell & Local Assets: Stale-While-Revalidate with resilient extensionless fallback
-  event.respondWith(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.match(event.request).then((cachedResponse) => {
-        // If exact cache match exists, return it and revalidate in background
-        if (cachedResponse) {
-          fetch(event.request).then((networkResponse) => {
+  // 3. Navigation Requests (HTML Page Transitions): Resilient offline & extensionless handling
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      (async () => {
+        const targetHtml = getMatchingHtmlPath(event.request.url);
+        const cache = await caches.open(CACHE_NAME);
+
+        // Check if target HTML is already cached
+        const cachedHtml = await cache.match(targetHtml, { ignoreSearch: true });
+
+        // Trigger network fetch in background to revalidate
+        const fetchPromise = fetch(event.request)
+          .then((networkResponse) => {
             if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-              cache.put(event.request, networkResponse.clone());
+              cache.put(targetHtml, networkResponse.clone());
             }
-          }).catch(() => {});
-          return cachedResponse;
+            return networkResponse;
+          })
+          .catch(() => null);
+
+        // If we already have the cached HTML, return it immediately for instant transitions
+        if (cachedHtml) {
+          fetchPromise.catch(() => {});
+          return cachedHtml;
         }
 
-        // If request is extensionless (e.g. /journal), resolve to cached .html asset immediately
-        const htmlFallbackPath = getMatchingHtmlPath(event.request.url);
-        if (htmlFallbackPath) {
-          return cache.match(htmlFallbackPath).then((htmlCached) => {
-            if (htmlCached) {
-              return htmlCached;
-            }
-            return fetch(event.request).then((netResp) => {
-              if (netResp && netResp.status === 200) {
-                cache.put(event.request, netResp.clone());
-                return netResp;
-              }
-              // If server returned 404 for extensionless URL, fallback to cached HTML
-              return cache.match(htmlFallbackPath) || cache.match('./app.html') || cache.match('./index.html');
-            }).catch(() => {
-              return cache.match(htmlFallbackPath) || cache.match('./app.html') || cache.match('./index.html');
-            });
-          });
+        // Otherwise wait for network response
+        const netResp = await fetchPromise;
+        if (netResp && (netResp.status === 200 || netResp.type === 'opaqueredirect')) {
+          return netResp;
         }
 
-        // Standard fetch with offline navigation safety net
-        return fetch(event.request).then((networkResponse) => {
+        // If network failed or returned 404, fallback to cached HTML
+        const fallback = (await cache.match(targetHtml, { ignoreSearch: true })) ||
+                         (await cache.match('./app.html', { ignoreSearch: true })) ||
+                         (await cache.match('./index.html', { ignoreSearch: true }));
+        if (fallback) {
+          return fallback;
+        }
+
+        return netResp || new Response('Offline - Page not found', { status: 404, headers: { 'Content-Type': 'text/plain' } });
+      })()
+    );
+    return;
+  }
+
+  // 4. App Shell & Static Assets: Stale-While-Revalidate with search query tolerance
+  event.respondWith(
+    caches.open(CACHE_NAME).then(async (cache) => {
+      const cachedResponse = await cache.match(event.request, { ignoreSearch: true });
+      const fetchPromise = fetch(event.request)
+        .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
             cache.put(event.request, networkResponse.clone());
           }
           return networkResponse;
-        }).catch((err) => {
-          if (event.request.mode === 'navigate') {
-            return cache.match('./app.html') || cache.match('./index.html');
-          }
-          return new Response('Network offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
-        });
-      });
+        })
+        .catch(() => null);
+
+      if (cachedResponse) {
+        fetchPromise.catch(() => {});
+        return cachedResponse;
+      }
+
+      const netResp = await fetchPromise;
+      return netResp || new Response('Asset unavailable offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
     })
   );
 });

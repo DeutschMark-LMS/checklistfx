@@ -399,24 +399,45 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.removeItem('dma_include_sample_data');
   } catch (_) {}
 
-  const routeButtons = document.querySelectorAll('[data-route]');
+  // Universal route resolver: works on custom domains, subpaths, clean URLs, and local files
+  function navigateToRoute(rawTarget) {
+    if (!rawTarget) return;
+    if (rawTarget.startsWith('http://') || rawTarget.startsWith('https://') || rawTarget.startsWith('mailto:') || rawTarget.startsWith('#')) {
+      window.location.href = rawTarget;
+      return;
+    }
+    const target = rawTarget.split('?')[0].split('#')[0];
+    const search = rawTarget.includes('?') ? '?' + rawTarget.split('?')[1].split('#')[0] : '';
+    const hash = rawTarget.includes('#') ? '#' + rawTarget.split('#')[1] : '';
 
-  routeButtons.forEach((button) => {
-    button.addEventListener('click', (event) => {
-      let target = button.getAttribute('data-route');
-      if (!target) return;
+    let cleanName = target.split('/').pop() || 'index';
+    if (!cleanName.includes('.')) {
+      cleanName = `${cleanName}.html`;
+    }
+    if (cleanName === '.html' || cleanName === 'index.html' || target === '/' || target === '') {
+      cleanName = 'index.html';
+    }
 
-      // Ensure proper navigation target with .html extension for static hosting/GitHub Pages
-      if (!target.startsWith('http') && !target.startsWith('#')) {
-        if (target === '/' || target === 'index' || target === '') {
-          target = 'index.html';
-        } else if (!target.includes('.')) {
-          target = `${target}.html`;
-        }
-      }
+    if (window.location.protocol === 'file:') {
+      window.location.href = cleanName + search + hash;
+      return;
+    }
 
+    // Resolves safely whether current URL is /app, /app/, or /repo/app
+    const currentUrl = new URL(window.location.href);
+    const basePath = currentUrl.pathname.replace(/\/+$/, '').replace(/\/[^/]*$/, '') || '';
+    window.location.href = `${currentUrl.origin}${basePath}/${cleanName}${search}${hash}`;
+  }
+  window.DMA_NAVIGATE = navigateToRoute;
+
+  // Intercept all route links, route buttons, and drawer links
+  document.querySelectorAll('a.drawer-link, a[data-route], button[data-route], [data-route], .drawer-action-btn').forEach((el) => {
+    const rawTarget = el.getAttribute('data-route') || el.getAttribute('href');
+    if (!rawTarget || rawTarget.startsWith('http') || rawTarget.startsWith('mailto:') || rawTarget.startsWith('#')) return;
+
+    el.addEventListener('click', (event) => {
       event.preventDefault();
-      window.location.href = target;
+      navigateToRoute(rawTarget);
     });
   });
 
@@ -443,8 +464,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const profileButton = document.querySelector('[data-action="profile"]');
   if (profileButton) {
     profileButton.addEventListener('click', () => {
-      window.location.href = 'profile.html';
+      navigateToRoute('profile.html');
     });
+  }
+
+  const drawerUserInfo = document.getElementById('drawer-user-info');
+  if (drawerUserInfo) {
+    drawerUserInfo.onclick = (e) => {
+      e.preventDefault();
+      navigateToRoute('profile.html');
+    };
   }
 
   // ==========================================================================
@@ -703,7 +732,11 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.removeItem('checklist-auth');
         localStorage.removeItem('dma_active_user');
       }
-      window.location.href = 'login.html';
+      if (typeof navigateToRoute === 'function') {
+        navigateToRoute('login.html');
+      } else {
+        window.location.href = 'login.html';
+      }
     });
   }
 
@@ -713,7 +746,11 @@ document.addEventListener('DOMContentLoaded', () => {
       event.preventDefault();
       localStorage.setItem('checklist-auth', 'true');
       const redir = form.dataset.redirect || 'app.html';
-      window.location.href = redir.endsWith('.html') ? redir : `${redir}.html`;
+      if (typeof navigateToRoute === 'function') {
+        navigateToRoute(redir);
+      } else {
+        window.location.href = redir.endsWith('.html') ? redir : `${redir}.html`;
+      }
     });
   });
 

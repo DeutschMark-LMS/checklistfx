@@ -17,10 +17,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=v3.0">
+  <link rel="stylesheet" href="style.css?v=v3.1">
   <!-- Firebase Auth SDK (v12) -->
-  <script type="module" src="firebaseClient.js?v=v3.0"></script>
-  <script src="app.js?v=v3.0" defer></script>
+  <script type="module" src="firebaseClient.js?v=v3.1"></script>
+  <script src="app.js?v=v3.1" defer></script>
 </head>
 <body class="auth-page">
 
@@ -171,7 +171,12 @@
                 localStorage.setItem('dma_trades', '[]');
                 localStorage.setItem('dma_custom_playbooks', '[]');
                 localStorage.setItem('dma_deleted_playbooks', '[]');
-                const getAppRoute = () => 'app.html';
+                const getAppRoute = () => {
+        if (window.location.protocol === 'file:') return 'app.html';
+        const currentUrl = new URL(window.location.href);
+        const basePath = currentUrl.pathname.replace(/\/+$/, '').replace(/\/[^/]*$/, '') || '';
+        return `${currentUrl.origin}${basePath}/app.html`;
+      };
                 showAlert('Account created successfully! Connecting cloud session...', 'success');
                 setTimeout(() => {
                   window.location.href = getAppRoute();
@@ -183,7 +188,12 @@
             }
           } else {
             // Local fallback
-            const getAppRoute = () => 'app.html';
+            const getAppRoute = () => {
+        if (window.location.protocol === 'file:') return 'app.html';
+        const currentUrl = new URL(window.location.href);
+        const basePath = currentUrl.pathname.replace(/\/+$/, '').replace(/\/[^/]*$/, '') || '';
+        return `${currentUrl.origin}${basePath}/app.html`;
+      };
             localStorage.removeItem('dma_include_sample_data');
             localStorage.setItem('dma_trades', '[]');
             localStorage.setItem('dma_custom_playbooks', '[]');
@@ -204,7 +214,12 @@
           localStorage.setItem('dma_custom_playbooks', '[]');
           localStorage.setItem('dma_deleted_playbooks', '[]');
 
-          const getAppRoute = () => 'app.html';
+          const getAppRoute = () => {
+        if (window.location.protocol === 'file:') return 'app.html';
+        const currentUrl = new URL(window.location.href);
+        const basePath = currentUrl.pathname.replace(/\/+$/, '').replace(/\/[^/]*$/, '') || '';
+        return `${currentUrl.origin}${basePath}/app.html`;
+      };
           const executeGoogleSignUp = async () => {
             if (window.DMA_AUTH) {
               const res = await window.DMA_AUTH.signInWithGoogle();
