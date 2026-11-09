@@ -1,8 +1,8 @@
-// Checklist Fx High-Performance Service Worker (v5)
+// Checklist Fx High-Performance Service Worker (v6)
 // Implements Stale-While-Revalidate for app shell, Cache-First for Google Fonts,
-// and Network-Only pass-through for Firebase Firestore/Auth.
+// extensionless path resolution to .html assets, and Network-Only pass-through for Firebase Firestore/Auth.
 
-const CACHE_NAME = 'checklistfx-pwa-v5';
+const CACHE_NAME = 'checklistfx-pwa-v6';
 const FONT_CACHE_NAME = 'checklistfx-fonts-v1';
 
 const PRECACHE_SHELL = [
@@ -26,6 +26,21 @@ const PRECACHE_SHELL = [
   './icons/icon-512-maskable.png',
   './icons/apple-touch-icon.png'
 ];
+
+// Helper to resolve an extensionless URL to its matching .html shell asset
+function getMatchingHtmlPath(urlStr) {
+  try {
+    const u = new URL(urlStr);
+    const lastSeg = u.pathname.split('/').filter(Boolean).pop() || '';
+    if (lastSeg && !lastSeg.includes('.')) {
+      const known = ['app', 'journal', 'playbook', 'analytics', 'profile', 'login', 'signup', 'index'];
+      if (known.includes(lastSeg.toLowerCase())) {
+        return `./${lastSeg.toLowerCase()}.html`;
+      }
+    }
+  } catch (_) {}
+  return null;
+}
 
 // Install: precache essential shell assets
 self.addEventListener('install', (event) => {
@@ -82,26 +97,52 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3. App Shell & Local Assets: Stale-While-Revalidate
-  // Serves cached version immediately (instant 5-15ms load) while fetching latest in background
+  // 3. App Shell & Local Assets: Stale-While-Revalidate with resilient extensionless fallback
   event.respondWith(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.match(event.request).then((cachedResponse) => {
-        const fetchPromise = fetch(event.request).then((networkResponse) => {
+        // If exact cache match exists, return it and revalidate in background
+        if (cachedResponse) {
+          fetch(event.request).then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+              cache.put(event.request, networkResponse.clone());
+            }
+          }).catch(() => {});
+          return cachedResponse;
+        }
+
+        // If request is extensionless (e.g. /journal), resolve to cached .html asset immediately
+        const htmlFallbackPath = getMatchingHtmlPath(event.request.url);
+        if (htmlFallbackPath) {
+          return cache.match(htmlFallbackPath).then((htmlCached) => {
+            if (htmlCached) {
+              return htmlCached;
+            }
+            return fetch(event.request).then((netResp) => {
+              if (netResp && netResp.status === 200) {
+                cache.put(event.request, netResp.clone());
+                return netResp;
+              }
+              // If server returned 404 for extensionless URL, fallback to cached HTML
+              return cache.match(htmlFallbackPath) || cache.match('./app.html') || cache.match('./index.html');
+            }).catch(() => {
+              return cache.match(htmlFallbackPath) || cache.match('./app.html') || cache.match('./index.html');
+            });
+          });
+        }
+
+        // Standard fetch with offline navigation safety net
+        return fetch(event.request).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
             cache.put(event.request, networkResponse.clone());
           }
           return networkResponse;
         }).catch((err) => {
-          // If offline and request is navigation, fallback to cached app shell
           if (event.request.mode === 'navigate') {
-            return caches.match('./app.html') || caches.match('./index.html');
+            return cache.match('./app.html') || cache.match('./index.html');
           }
-          return null;
+          return new Response('Network offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
         });
-
-        // Return instant cached response if available, else wait for network
-        return cachedResponse || fetchPromise;
       });
     })
   );

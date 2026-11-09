@@ -17,16 +17,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css">
-  <script>
-    if (typeof window !== 'undefined' && location.protocol !== 'file:' && (location.pathname.endsWith('.html') || location.pathname.endsWith('/index') || location.pathname === '/index')) {
-      const cleanPath = location.pathname.replace(/\/index(\.html)?$/i, '/').replace(/\.html$/i, '') || '/';
-      history.replaceState(null, '', cleanPath + location.search + location.hash);
-    }
-  </script>
+  <link rel="stylesheet" href="style.css?v=v3.0">
   <!-- Firebase Auth SDK (v12) -->
-  <script type="module" src="firebaseClient.js?v=v2.9"></script>
-  <script src="app.js?v=v2.9" defer></script>
+  <script type="module" src="firebaseClient.js?v=v3.0"></script>
+  <script src="app.js?v=v3.0" defer></script>
 </head>
 <body class="auth-page">
 
@@ -177,7 +171,7 @@
                 localStorage.setItem('dma_trades', '[]');
                 localStorage.setItem('dma_custom_playbooks', '[]');
                 localStorage.setItem('dma_deleted_playbooks', '[]');
-                const getAppRoute = () => (window.location.protocol === 'file:' ? 'app.html' : 'app');
+                const getAppRoute = () => 'app.html';
                 showAlert('Account created successfully! Connecting cloud session...', 'success');
                 setTimeout(() => {
                   window.location.href = getAppRoute();
@@ -189,7 +183,7 @@
             }
           } else {
             // Local fallback
-            const getAppRoute = () => (window.location.protocol === 'file:' ? 'app.html' : 'app');
+            const getAppRoute = () => 'app.html';
             localStorage.removeItem('dma_include_sample_data');
             localStorage.setItem('dma_trades', '[]');
             localStorage.setItem('dma_custom_playbooks', '[]');
@@ -210,7 +204,7 @@
           localStorage.setItem('dma_custom_playbooks', '[]');
           localStorage.setItem('dma_deleted_playbooks', '[]');
 
-          const getAppRoute = () => (window.location.protocol === 'file:' ? 'app.html' : 'app');
+          const getAppRoute = () => 'app.html';
           const executeGoogleSignUp = async () => {
             if (window.DMA_AUTH) {
               const res = await window.DMA_AUTH.signInWithGoogle();

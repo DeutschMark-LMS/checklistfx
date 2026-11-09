@@ -9,6 +9,8 @@ function getOrCreateToastContainer() {
     container = document.createElement('div');
     container.id = 'app-toast-container';
     container.className = 'app-toast-container';
+    // Robust inline fallback styles so it NEVER falls into document flow or bottom corner
+    container.style.cssText = 'position:fixed;top:1.25rem;right:1.25rem;z-index:9999999;display:flex;flex-direction:column;gap:0.65rem;max-width:380px;width:calc(100vw - 2.5rem);pointer-events:none;';
     document.body.appendChild(container);
   }
   return container;
@@ -19,7 +21,7 @@ function getOrCreateToastContainer() {
  * @param {Object} options - { title, message, type: 'success'|'warning'|'error'|'info', duration: 4000 }
  */
 function showAppToast(options = {}) {
-  let { title = '', message = '', type = 'success', duration = 4000 } = options;
+  let { title = '', message = '', type = 'success', duration = 3800 } = options;
   if (typeof options === 'string') {
     message = options;
     title = type === 'success' ? 'Success' : 'Checklist Fx';
@@ -29,8 +31,16 @@ function showAppToast(options = {}) {
   const toast = document.createElement('div');
   toast.className = `app-toast toast-${type}`;
 
+  const colorMap = {
+    success: { border: 'rgba(16, 185, 129, 0.45)', bg: 'rgba(16, 185, 129, 0.15)', text: '#10b981', glow: 'rgba(16, 185, 129, 0.2)' },
+    warning: { border: 'rgba(245, 158, 11, 0.45)', bg: 'rgba(245, 158, 11, 0.15)', text: '#fbbf24', glow: 'rgba(245, 158, 11, 0.2)' },
+    error: { border: 'rgba(244, 63, 94, 0.45)', bg: 'rgba(244, 63, 94, 0.15)', text: '#f43f5e', glow: 'rgba(244, 63, 94, 0.2)' },
+    info: { border: 'rgba(56, 189, 248, 0.45)', bg: 'rgba(56, 189, 248, 0.15)', text: '#38bdf8', glow: 'rgba(56, 189, 248, 0.2)' }
+  };
+  const theme = colorMap[type] || colorMap.info;
+
   const iconMap = {
-    success: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
+    success: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
     warning: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
     error: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>',
     info: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>'
@@ -38,27 +48,57 @@ function showAppToast(options = {}) {
 
   const iconSvg = iconMap[type] || iconMap.info;
 
+  toast.style.cssText = `
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: rgba(13, 17, 23, 0.96);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid ${theme.border};
+    border-radius: 12px;
+    box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.8), 0 0 20px -4px ${theme.glow};
+    color: #f1f5f9;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+    pointer-events: auto;
+    opacity: 0;
+    transform: translateY(-12px) scale(0.97);
+    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    overflow: hidden;
+    box-sizing: border-box;
+  `;
+
   toast.innerHTML = `
-    <div class="app-toast-icon">${iconSvg}</div>
-    <div class="app-toast-body">
-      ${title ? `<div class="app-toast-title">${title}</div>` : ''}
-      <div class="app-toast-message">${message}</div>
+    <div class="app-toast-icon" style="width:32px;height:32px;border-radius:8px;background:${theme.bg};border:1px solid ${theme.border};color:${theme.text};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      ${iconSvg}
     </div>
-    <button type="button" class="app-toast-close" aria-label="Close notification">
+    <div class="app-toast-body" style="flex:1;min-width:0;">
+      ${title ? `<div class="app-toast-title" style="font-size:0.84rem;font-weight:700;color:#ffffff;line-height:1.2;margin-bottom:0.15rem;letter-spacing:-0.01em;">${title}</div>` : ''}
+      <div class="app-toast-message" style="font-size:0.77rem;color:#94a3b8;line-height:1.4;word-break:break-word;">${message}</div>
+    </div>
+    <button type="button" class="app-toast-close" aria-label="Close notification" style="background:transparent;border:none;color:#64748b;cursor:pointer;padding:0.25rem;line-height:1;display:flex;align-items:center;justify-content:center;border-radius:6px;flex-shrink:0;transition:color 0.15s ease;">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
     </button>
   `;
 
   const closeBtn = toast.querySelector('.app-toast-close');
+  if (closeBtn) {
+    closeBtn.onmouseenter = () => { closeBtn.style.color = '#ffffff'; };
+    closeBtn.onmouseleave = () => { closeBtn.style.color = '#64748b'; };
+  }
   let dismissTimeout = null;
 
   const dismiss = () => {
     if (dismissTimeout) clearTimeout(dismissTimeout);
     toast.classList.remove('show');
     toast.classList.add('hide');
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(-10px) scale(0.96)';
     setTimeout(() => {
       if (toast.parentNode) toast.parentNode.removeChild(toast);
-    }, 300);
+    }, 240);
   };
 
   closeBtn.addEventListener('click', dismiss);
@@ -67,6 +107,8 @@ function showAppToast(options = {}) {
   // Trigger enter animation
   requestAnimationFrame(() => {
     toast.classList.add('show');
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0) scale(1)';
   });
 
   if (duration > 0) {
@@ -364,9 +406,13 @@ document.addEventListener('DOMContentLoaded', () => {
       let target = button.getAttribute('data-route');
       if (!target) return;
 
-      if (window.location.protocol !== 'file:') {
-        target = target.replace(/\.html$/i, '');
-        if (target === 'index' || target === '') target = '/';
+      // Ensure proper navigation target with .html extension for static hosting/GitHub Pages
+      if (!target.startsWith('http') && !target.startsWith('#')) {
+        if (target === '/' || target === 'index' || target === '') {
+          target = 'index.html';
+        } else if (!target.includes('.')) {
+          target = `${target}.html`;
+        }
       }
 
       event.preventDefault();
@@ -397,7 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const profileButton = document.querySelector('[data-action="profile"]');
   if (profileButton) {
     profileButton.addEventListener('click', () => {
-      window.location.href = window.location.protocol === 'file:' ? 'profile.html' : 'profile';
+      window.location.href = 'profile.html';
     });
   }
 
@@ -657,7 +703,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.removeItem('checklist-auth');
         localStorage.removeItem('dma_active_user');
       }
-      window.location.href = window.location.protocol === 'file:' ? 'login.html' : 'login';
+      window.location.href = 'login.html';
     });
   }
 
@@ -666,8 +712,8 @@ document.addEventListener('DOMContentLoaded', () => {
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       localStorage.setItem('checklist-auth', 'true');
-      const redir = form.dataset.redirect || 'app';
-      window.location.href = window.location.protocol === 'file:' ? (redir.endsWith('.html') ? redir : `${redir}.html`) : redir.replace(/\.html$/i, '');
+      const redir = form.dataset.redirect || 'app.html';
+      window.location.href = redir.endsWith('.html') ? redir : `${redir}.html`;
     });
   });
 
@@ -4668,37 +4714,37 @@ if (checklistCreatorForm) {
         window.DMA_DB.savePlaybook(existing).then(res => {
           if (res && res.isGuest) {
             showAppToast({
-              title: 'Playbook Updated (Local Only)',
-              message: `"${name}" updated on this device.\n\n⚠ Note: You are browsing as a guest. Sign in to back up your changes to the cloud.`,
-              type: 'warning',
-              duration: 5500
+              title: 'Playbook Saved Locally',
+              message: `"${name}" updated on this device. Sign in to sync across devices.`,
+              type: 'info',
+              duration: 4000
             });
           } else if (res && res.cloudSaved) {
             showAppToast({
-              title: 'Playbook Updated & Synced!',
-              message: `"${name}" is safely backed up to your Checklist Fx cloud account.`,
+              title: 'Playbook Saved',
+              message: `"${name}" changes synced to your cloud account.`,
               type: 'success',
-              duration: 4000
+              duration: 3500
             });
           } else if (res && res.error) {
             const errCode = res.error.code || '';
             const isPerm = errCode === 'permission-denied';
             showAppToast({
-              title: isPerm ? 'Cloud Permissions Error' : 'Playbook Updated Locally',
+              title: isPerm ? 'Permissions Notice' : 'Saved to Device',
               message: isPerm
-                ? 'Firestore Security Rules rejected write. Please publish rules in Firebase Console.\nSaved to this device.'
-                : `Cloud sync pending (${res.error.message || 'Network'}). Saved to this device.`,
+                ? `Saved to device. Firestore rules rejected write.`
+                : `Saved to device. Cloud sync pending.`,
               type: 'warning',
-              duration: 6000
+              duration: 4000
             });
           }
         }).catch(err => console.warn('Firestore update error', err));
       } else {
         showAppToast({
-          title: 'Playbook Updated!',
-          message: `"${name}" has been updated successfully.`,
+          title: 'Playbook Saved',
+          message: `"${name}" updated successfully.`,
           type: 'success',
-          duration: 3500
+          duration: 3000
         });
       }
 
@@ -4747,28 +4793,28 @@ if (checklistCreatorForm) {
       window.DMA_DB.savePlaybook(newPlaybook).then(res => {
         if (res && res.isGuest) {
           showAppToast({
-            title: 'New Playbook Saved (Local Only)',
-            message: `"${name}" is active!\n\n⚠ Note: You are currently browsing as a guest. Data will be cleared if you wipe site storage. Sign in to permanently save to your cloud account.`,
-            type: 'warning',
-            duration: 6000
+            title: 'Playbook Created Locally',
+            message: `"${name}" is active on this device. Sign in to back up to cloud.`,
+            type: 'info',
+            duration: 4000
           });
         } else if (res && res.cloudSaved) {
           showAppToast({
-            title: 'New Playbook Saved & Synced!',
-            message: `"${name}" is live and safely backed up to your Checklist Fx cloud account.`,
+            title: 'Playbook Created',
+            message: `"${name}" added and synced to your cloud account.`,
             type: 'success',
-            duration: 4500
+            duration: 3500
           });
         } else if (res && res.error) {
           const errCode = res.error.code || '';
           const isPerm = errCode === 'permission-denied';
           showAppToast({
-            title: isPerm ? 'Cloud Permissions Error' : 'New Playbook Saved (Local Cache)',
+            title: isPerm ? 'Permissions Notice' : 'Saved to Device',
             message: isPerm
-              ? `"${name}" saved to device. Firestore Rules rejected cloud write. Check Firebase Console.`
-              : `"${name}" is saved on this device. Cloud sync pending (${res.error.message || 'Permission/Network'}).`,
+              ? `"${name}" saved to device. Firestore rules rejected write.`
+              : `"${name}" saved to device. Cloud sync pending.`,
             type: 'warning',
-            duration: 6000
+            duration: 4000
           });
         }
       }).catch(err => {
@@ -4776,10 +4822,10 @@ if (checklistCreatorForm) {
       });
     } else {
       showAppToast({
-        title: 'New Playbook Saved!',
-        message: `"${name}" is now live in Your Playbook and selectable in the trade logger.`,
+        title: 'Playbook Created',
+        message: `"${name}" added to your strategies.`,
         type: 'success',
-        duration: 4000
+        duration: 3000
       });
     }
 

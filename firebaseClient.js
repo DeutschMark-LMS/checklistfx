@@ -127,7 +127,7 @@ function updateCloudSyncIndicator(status, message, details) {
     badge.classList.add('guest');
     badge.title = details || 'Guest Mode: Data saved to this phone only. Tap to Log In and sync to cloud.';
     if (text) text.textContent = message || 'Local Only (Sign In)';
-    badge.onclick = () => { window.location.href = (window.location.protocol === 'file:' ? 'login.html' : 'login'); };
+    badge.onclick = () => { window.location.href = 'login.html'; };
   } else if (status === 'offline') {
     badge.classList.add('offline');
     badge.title = details || 'Sync Error: Tap to view diagnostics.';
@@ -417,7 +417,7 @@ const DMA_AUTH = {
         localStorage.setItem('dma_user', JSON.stringify(standardUser));
         localStorage.setItem('dma_active_user', JSON.stringify(standardUser));
 
-        window.location.href = (window.location.protocol === 'file:' ? 'app.html' : 'app');
+        window.location.href = 'app.html';
         return { data: { user: standardUser }, error: null };
       } catch (err) {
         console.warn('[DMA Firebase] Google sign-in popup error:', err);
@@ -455,7 +455,7 @@ const DMA_AUTH = {
     localStorage.setItem('checklist-auth', 'true');
     localStorage.setItem('dma_user', JSON.stringify(localUser));
     localStorage.setItem('dma_active_user', JSON.stringify(localUser));
-    window.location.href = (window.location.protocol === 'file:' ? 'app.html' : 'app');
+    window.location.href = 'app.html';
     return { data: { user: localUser }, error: null };
   },
 
@@ -473,7 +473,7 @@ const DMA_AUTH = {
       localStorage.removeItem('checklist-auth');
       localStorage.removeItem('dma_user');
       localStorage.removeItem('dma_active_user');
-      window.location.href = (window.location.protocol === 'file:' ? 'login.html' : 'login');
+      window.location.href = 'login.html';
     }
   },
 
@@ -919,7 +919,7 @@ if (auth && typeof getRedirectResult === 'function') {
         // If currently on login or signup, navigate directly to app
         const currentPath = (window.location.pathname || '').toLowerCase();
         if (currentPath.endsWith('login.html') || currentPath.endsWith('signup.html') || currentPath.includes('/login') || currentPath.includes('/signup')) {
-          window.location.replace(window.location.protocol === 'file:' ? 'app.html' : 'app');
+          window.location.replace('app.html');
         }
       }
     })
