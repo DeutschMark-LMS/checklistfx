@@ -133,44 +133,80 @@ function showAppConfirm(options = {}) {
   } = options;
 
   return new Promise((resolve) => {
+    // Remove any lingering confirm dialogs to prevent duplication
+    const existing = document.querySelectorAll('.app-dialog-backdrop');
+    existing.forEach(el => {
+      if (el.parentNode) el.parentNode.removeChild(el);
+    });
+
     const backdrop = document.createElement('div');
     backdrop.className = 'app-dialog-backdrop';
 
     const iconMap = {
-      danger: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
-      warning: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
-      info: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>'
+      danger: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+      warning: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
+      info: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>'
     };
 
     const confirmBtnClass = type === 'danger' ? 'confirm-danger' : 'confirm-primary';
+    const confirmBtnIcon = type === 'danger'
+      ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>'
+      : '';
 
     backdrop.innerHTML = `
       <div class="app-dialog-card" role="dialog" aria-modal="true">
         <div class="app-dialog-header">
           <div class="app-dialog-icon ${type}">${iconMap[type] || iconMap.danger}</div>
-          <h3 class="app-dialog-title">${title}</h3>
+          <div style="flex: 1; min-width: 0;">
+            <h3 class="app-dialog-title">${title}</h3>
+            <p class="app-dialog-message">${message}</p>
+          </div>
         </div>
-        <p class="app-dialog-message">${message}</p>
         <div class="app-dialog-actions">
           <button type="button" class="app-dialog-btn cancel" id="app-dialog-cancel-btn">${cancelText}</button>
-          <button type="button" class="app-dialog-btn ${confirmBtnClass}" id="app-dialog-confirm-btn">${confirmText}</button>
+          <button type="button" class="app-dialog-btn ${confirmBtnClass}" id="app-dialog-confirm-btn">${confirmBtnIcon}${confirmText}</button>
         </div>
       </div>
     `;
 
     document.body.appendChild(backdrop);
-    requestAnimationFrame(() => backdrop.classList.add('open'));
+    const cancelBtn = backdrop.querySelector('#app-dialog-cancel-btn');
+    const confirmBtn = backdrop.querySelector('#app-dialog-confirm-btn');
+    const card = backdrop.querySelector('.app-dialog-card');
 
+    requestAnimationFrame(() => {
+      backdrop.classList.add('open');
+      if (cancelBtn) cancelBtn.focus();
+    });
+
+    let resolved = false;
     const cleanup = (result) => {
+      if (resolved) return;
+      resolved = true;
+      window.removeEventListener('keydown', handleKeyDown);
+
       backdrop.classList.remove('open');
+      if (card) {
+        card.style.transform = 'scale(0.92) translateY(10px)';
+        card.style.opacity = '0';
+      }
+
       setTimeout(() => {
         if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
       }, 250);
       resolve(result);
     };
 
-    backdrop.querySelector('#app-dialog-confirm-btn').addEventListener('click', () => cleanup(true));
-    backdrop.querySelector('#app-dialog-cancel-btn').addEventListener('click', () => cleanup(false));
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        cleanup(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    confirmBtn.addEventListener('click', () => cleanup(true));
+    cancelBtn.addEventListener('click', () => cleanup(false));
     backdrop.addEventListener('click', (e) => {
       if (e.target === backdrop) cleanup(false);
     });
@@ -1801,7 +1837,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!currentInspectedCard) return;
         const confirmed = await showAppConfirm({
           title: 'Delete Trade from Journal?',
-          message: 'Are you sure you want to delete this trade from your journal? This will update your net P&L and performance metrics.',
+          message: 'Are you sure you want to delete this trade from your journal?\n\nThis will permanently remove the record and update your net P&L and performance metrics.',
           confirmText: 'Delete Trade',
           cancelText: 'Cancel',
           type: 'danger'
@@ -1809,22 +1845,51 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!confirmed) return;
 
         const tradeId = currentInspectedTradeId;
+        const targetCard = currentInspectedCard;
+
+        // 1. Instantly close inspector modal smoothly
+        closeTradeInspector();
+
+        // 2. Animate card removal in journal list
+        if (targetCard) {
+          targetCard.style.transition = 'all 0.26s cubic-bezier(0.16, 1, 0.3, 1)';
+          targetCard.style.opacity = '0';
+          targetCard.style.transform = 'translateX(-20px) scale(0.96)';
+          targetCard.style.pointerEvents = 'none';
+          setTimeout(() => {
+            targetCard.remove();
+            applyAllJournalFilters();
+          }, 260);
+        }
+
+        // 3. Update localStorage for trades and debriefs
         try {
           const stored = JSON.parse(localStorage.getItem('dma_trades') || '[]');
           const updated = stored.filter(t => String(t.id) !== String(tradeId));
           localStorage.setItem('dma_trades', JSON.stringify(updated));
+
+          const storedDebriefs = JSON.parse(localStorage.getItem('dma_trade_debriefs') || '{}');
+          if (storedDebriefs[tradeId]) {
+            delete storedDebriefs[tradeId];
+            localStorage.setItem('dma_trade_debriefs', JSON.stringify(storedDebriefs));
+          }
         } catch (err) {
           console.warn('Could not remove trade from storage', err);
         }
 
-        // Delete from Cloud Firestore backend
+        // 4. Delete from Cloud Firestore backend
         if (window.DMA_DB && typeof window.DMA_DB.deleteTrade === 'function') {
           window.DMA_DB.deleteTrade(tradeId);
         }
 
-        currentInspectedCard.remove();
-        closeTradeInspector();
+        // 5. Update filters, KPIs, and calendar heatmap immediately
         applyAllJournalFilters();
+        if (typeof renderCalendarHeatmap === 'function') {
+          renderCalendarHeatmap();
+        }
+        if (typeof window.updateDashboardMetrics === 'function') {
+          window.updateDashboardMetrics();
+        }
 
         showAppToast({
           title: 'Trade Deleted',
@@ -4423,11 +4488,14 @@ if (pbDeleteBtn) {
     });
     if (!confirmed) return;
 
-    // 1. Delete from in-memory objects immediately
+    // 1. Immediately close detail modal smoothly
+    closePlaybookDetailModal();
+
+    // 2. Delete from in-memory objects immediately
     delete playbookRegistry[targetId];
     delete tradeStrategies[targetId];
 
-    // 2. Update localStorage immediately
+    // 3. Update localStorage immediately
     try {
       const customSaved = JSON.parse(localStorage.getItem('dma_custom_playbooks') || '[]');
       const filtered = customSaved.filter(item => String(item.id) !== String(targetId) && String(item.key) !== String(targetId));
@@ -4446,9 +4514,6 @@ if (pbDeleteBtn) {
     } catch (err) {
       console.warn('Storage error during playbook delete:', err);
     }
-
-    // 3. Close inspector modal immediately
-    closePlaybookDetailModal();
 
     // 4. Force re-render grids immediately so card vanishes without reload
     if (typeof window.renderDashboardPlaybooks === 'function') {
