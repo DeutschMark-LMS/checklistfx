@@ -56,11 +56,24 @@ let googleProvider = null;
 function safeNavigate(targetHtml, replace = false) {
   if (typeof window === 'undefined') return;
   if (typeof window.DMA_NAVIGATE === 'function') {
-    window.DMA_NAVIGATE(targetHtml);
+    window.DMA_NAVIGATE(targetHtml, replace);
     return;
   }
+  if (typeof window.resolveRouteUrl === 'function') {
+    const resolved = window.resolveRouteUrl(targetHtml);
+    if (replace) window.location.replace(resolved);
+    else window.location.href = resolved;
+    return;
+  }
+  const isFile = window.location.protocol === 'file:';
+  const host = window.location.hostname || '';
+  const isLocalhost = host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host.endsWith('.local');
+  const isGitHubPages = host.endsWith('github.io');
+  const currentHasHtml = window.location.pathname.toLowerCase().endsWith('.html');
+  const useHtml = isFile || isLocalhost || isGitHubPages || currentHasHtml;
+
   let cleanName = targetHtml.replace(/\.html$/i, '').replace(/^\/+/, '');
-  if (window.location.protocol === 'file:') {
+  if (isFile) {
     const fileTarget = cleanName ? `${cleanName}.html` : 'index.html';
     if (replace) window.location.replace(fileTarget);
     else window.location.href = fileTarget;
@@ -68,7 +81,7 @@ function safeNavigate(targetHtml, replace = false) {
   }
   const currentUrl = new URL(window.location.href);
   const basePath = currentUrl.pathname.replace(/\/+$/, '').replace(/\/[^/]*$/, '') || '';
-  const targetPath = cleanName ? `/${cleanName}` : '/';
+  const targetPath = useHtml ? (cleanName ? `/${cleanName}.html` : '/index.html') : (cleanName ? `/${cleanName}` : '/');
   const resolved = `${currentUrl.origin}${basePath}${targetPath}`;
   if (replace) window.location.replace(resolved);
   else window.location.href = resolved;

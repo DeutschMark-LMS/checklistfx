@@ -399,45 +399,78 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.removeItem('dma_include_sample_data');
   } catch (_) {}
 
-  // Universal route resolver: works on custom domains, subpaths, clean URLs, and local files
-  function navigateToRoute(rawTarget) {
-    if (!rawTarget) return;
+  // Universal route resolver: works on localhost, Live Server, GitHub Pages, custom domains, subpaths, clean URLs, and local files
+  function resolveRouteUrl(rawTarget) {
+    if (!rawTarget) return '';
     if (rawTarget.startsWith('http://') || rawTarget.startsWith('https://') || rawTarget.startsWith('mailto:') || rawTarget.startsWith('#')) {
-      window.location.href = rawTarget;
-      return;
+      return rawTarget;
     }
     const target = rawTarget.split('?')[0].split('#')[0];
     const search = rawTarget.includes('?') ? '?' + rawTarget.split('?')[1].split('#')[0] : '';
     const hash = rawTarget.includes('#') ? '#' + rawTarget.split('#')[1] : '';
 
-    let cleanName = target.split('/').pop() || 'index';
+    let cleanName = target.split('/').filter(Boolean).pop() || '';
     cleanName = cleanName.toLowerCase().replace(/\.html$/i, '');
     if (cleanName === 'index' || target === '/' || target === '') {
       cleanName = '';
     }
 
-    // Local file protocol needs .html extension
-    if (window.location.protocol === 'file:') {
+    const isFile = window.location.protocol === 'file:';
+    const host = window.location.hostname || '';
+    const isLocalhost = host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host.endsWith('.local');
+    const isGitHubPages = host.endsWith('github.io');
+    const currentHasHtml = window.location.pathname.toLowerCase().endsWith('.html');
+
+    // Use .html extension if on local/static hosts or if the current page itself is using .html
+    const useHtml = isFile || isLocalhost || isGitHubPages || currentHasHtml;
+
+    if (isFile) {
       const fileName = cleanName ? `${cleanName}.html` : 'index.html';
-      window.location.href = fileName + search + hash;
+      return fileName + search + hash;
+    }
+
+    const currentUrl = new URL(window.location.href);
+    const basePath = currentUrl.pathname.replace(/\/+$/, '').replace(/\/[^/]*$/, '') || '';
+
+    let targetPath = '';
+    if (useHtml) {
+      const fileName = cleanName ? `${cleanName}.html` : 'index.html';
+      targetPath = `/${fileName}`;
+    } else {
+      targetPath = cleanName ? `/${cleanName}` : '/';
+    }
+
+    return `${currentUrl.origin}${basePath}${targetPath}${search}${hash}`;
+  }
+  window.resolveRouteUrl = resolveRouteUrl;
+
+  function navigateToRoute(rawTarget, replace = false) {
+    if (!rawTarget) return;
+    const finalUrl = resolveRouteUrl(rawTarget);
+    if (!finalUrl) return;
+
+    if (rawTarget.startsWith('http://') || rawTarget.startsWith('https://') || rawTarget.startsWith('mailto:') || rawTarget.startsWith('#')) {
+      if (replace) window.location.replace(finalUrl);
+      else window.location.href = finalUrl;
       return;
     }
 
-    // Web hosting (Vercel, Firebase) with cleanUrls: use clean extensionless route directly to prevent redirects
     const currentUrl = new URL(window.location.href);
-    const basePath = currentUrl.pathname.replace(/\/+$/, '').replace(/\/[^/]*$/, '') || '';
-    const targetPath = cleanName ? `/${cleanName}` : '/';
-    const finalUrl = `${currentUrl.origin}${basePath}${targetPath}${search}${hash}`;
+    const targetUrl = new URL(finalUrl, window.location.href);
 
-    // If already on the target page, just close the drawer
+    // If already on the exact same page path, simply close drawer and don't reload
     const currentClean = currentUrl.pathname.replace(/\.html$/i, '').replace(/\/+$/, '') || '/';
-    const targetClean = (basePath + targetPath).replace(/\/+$/, '') || '/';
-    if (currentClean === targetClean && !hash) {
+    const targetClean = targetUrl.pathname.replace(/\.html$/i, '').replace(/\/+$/, '') || '/';
+    if (currentClean === targetClean && currentUrl.origin === targetUrl.origin && (!targetUrl.hash || targetUrl.hash === currentUrl.hash)) {
       document.body.classList.remove('nav-open');
       return;
     }
 
-    window.location.href = finalUrl;
+    if (replace) {
+      window.location.replace(finalUrl);
+    } else {
+      window.location.href = finalUrl;
+    }
   }
   window.DMA_NAVIGATE = navigateToRoute;
 
@@ -745,8 +778,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (typeof navigateToRoute === 'function') {
         navigateToRoute('login');
+      } else if (typeof window.resolveRouteUrl === 'function') {
+        window.location.href = window.resolveRouteUrl('login');
       } else {
-        window.location.href = window.location.protocol === 'file:' ? 'login.html' : 'login';
+        window.location.href = 'login.html';
       }
     });
   }
@@ -759,8 +794,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const redir = form.dataset.redirect || 'app';
       if (typeof navigateToRoute === 'function') {
         navigateToRoute(redir);
+      } else if (typeof window.resolveRouteUrl === 'function') {
+        window.location.href = window.resolveRouteUrl(redir);
       } else {
-        window.location.href = window.location.protocol === 'file:' ? (redir.endsWith('.html') ? redir : `${redir}.html`) : redir.replace(/\.html$/i, '');
+        window.location.href = `${redir}.html`;
       }
     });
   });
@@ -5284,11 +5321,23 @@ if (document.readyState === 'loading') {
 // ==========================================================================
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=v9').then((reg) => {
       console.log('[PWA] ServiceWorker registered with scope:', reg.scope);
+      // Force checking for updates immediately on load
+      reg.update().catch(() => {});
     }).catch((err) => {
       console.log('[PWA] ServiceWorker registration failed:', err);
     });
+  });
+
+  // Seamless auto-reload when a new service worker takes control (cleans stale cache)
+  let isSwRefreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!isSwRefreshing) {
+      isSwRefreshing = true;
+      console.log('[PWA] Fresh service worker activated, reloading...');
+      window.location.reload();
+    }
   });
 }
 

@@ -17,15 +17,19 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=v3.2">
+  <link rel="stylesheet" href="style.css?v=v3.3">
+  <!-- Universal URL Resolver for Localhost, Live Server, GitHub Pages & Vercel -->
+  <script>
+    (function(){function r(e){if(!e)return"";if(e.startsWith("http://")||e.startsWith("https://")||e.startsWith("mailto:")||e.startsWith("#"))return e;const t=e.split("?")[0].split("#")[0],s=e.includes("?")?"?"+e.split("?")[1].split("#")[0]:"",n=e.includes("#")?"#"+e.split("#")[1]:"";let o=t.split("/").filter(Boolean).pop()||"";o=o.toLowerCase().replace(/\.html$/i,""),("index"===o||"/"===t||""===t)&&(o="");const l="file:"===window.location.protocol,a=window.location.hostname||"",i="localhost"===a||"127.0.0.1"===a||"0.0.0.0"===a||a.endsWith(".local"),c=a.endsWith("github.io"),h=window.location.pathname.toLowerCase().endsWith(".html"),d=l||i||c||h;if(l)return(o?`${o}.html`:"index.html")+s+n;const p=new URL(window.location.href),u=p.pathname.replace(/\/+$/,"").replace(/\/[^/]*$/,"")||"",w=d?o?`/${o}.html`:"/index.html":o?`/${o}`:"/";return`${p.origin}${u}${w}${s}${n}`}function n(e,t=!1){const s=r(e);if(s){if(e.startsWith("http://")||e.startsWith("https://")||e.startsWith("mailto:")||e.startsWith("#"))return void(t?window.location.replace(s):window.location.href=s);const n=new URL(window.location.href),o=new URL(s,window.location.href),l=n.pathname.replace(/\.html$/i,"").replace(/\/+$/,"")||"/",a=o.pathname.replace(/\.html$/i,"").replace(/\/+$/,"")||"/";if(l===a&&n.origin===o.origin&&(!o.hash||o.hash===n.hash))return void document.body.classList.remove("nav-open");t?window.location.replace(s):window.location.href=s}}window.resolveRouteUrl=r,window.DMA_NAVIGATE=n})();
+  </script>
   <!-- Firebase Auth SDK (v12) -->
-  <script type="module" src="firebaseClient.js?v=v3.2"></script>
-  <script src="app.js?v=v3.2" defer></script>
+  <script type="module" src="firebaseClient.js?v=v3.3"></script>
+  <script src="app.js?v=v3.3" defer></script>
 </head>
 <body class="auth-page">
 
   <div class="auth-container">
-    <a href="/" class="auth-logo" data-route="/">
+    <a href="index.html" class="auth-logo" data-route="index.html">
       <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
       <span>Checklist</span>
     </a>
@@ -80,7 +84,7 @@
         </button>
       </form>
       
-      <p class="auth-footer">Already have an account? <a href="login">Log in</a></p>
+      <p class="auth-footer">Already have an account? <a href="login.html" data-route="login.html">Log in</a></p>
     </div>
   </div>
 
@@ -172,11 +176,11 @@
                 localStorage.setItem('dma_custom_playbooks', '[]');
                 localStorage.setItem('dma_deleted_playbooks', '[]');
                 const getAppRoute = () => {
-        if (window.location.protocol === 'file:') return 'app.html';
-        const currentUrl = new URL(window.location.href);
-        const basePath = currentUrl.pathname.replace(/\/+$/, '').replace(/\/[^/]*$/, '') || '';
-        return `${currentUrl.origin}${basePath}/app`;
-      };
+                  if (typeof window.resolveRouteUrl === 'function') {
+                    return window.resolveRouteUrl('app');
+                  }
+                  return window.location.protocol === 'file:' ? 'app.html' : 'app.html';
+                };
                 showAlert('Account created successfully! Connecting cloud session...', 'success');
                 setTimeout(() => {
                   window.location.href = getAppRoute();
@@ -189,11 +193,11 @@
           } else {
             // Local fallback
             const getAppRoute = () => {
-        if (window.location.protocol === 'file:') return 'app.html';
-        const currentUrl = new URL(window.location.href);
-        const basePath = currentUrl.pathname.replace(/\/+$/, '').replace(/\/[^/]*$/, '') || '';
-        return `${currentUrl.origin}${basePath}/app`;
-      };
+              if (typeof window.resolveRouteUrl === 'function') {
+                return window.resolveRouteUrl('app');
+              }
+              return window.location.protocol === 'file:' ? 'app.html' : 'app.html';
+            };
             localStorage.removeItem('dma_include_sample_data');
             localStorage.setItem('dma_trades', '[]');
             localStorage.setItem('dma_custom_playbooks', '[]');
@@ -215,11 +219,11 @@
           localStorage.setItem('dma_deleted_playbooks', '[]');
 
           const getAppRoute = () => {
-        if (window.location.protocol === 'file:') return 'app.html';
-        const currentUrl = new URL(window.location.href);
-        const basePath = currentUrl.pathname.replace(/\/+$/, '').replace(/\/[^/]*$/, '') || '';
-        return `${currentUrl.origin}${basePath}/app`;
-      };
+            if (typeof window.resolveRouteUrl === 'function') {
+              return window.resolveRouteUrl('app');
+            }
+            return window.location.protocol === 'file:' ? 'app.html' : 'app.html';
+          };
           const executeGoogleSignUp = async () => {
             if (window.DMA_AUTH) {
               const res = await window.DMA_AUTH.signInWithGoogle();

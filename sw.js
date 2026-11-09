@@ -1,8 +1,9 @@
-// Checklist Fx High-Performance Service Worker (v8)
-// Implements Stale-While-Revalidate for app shell, Cache-First for Google Fonts,
-// clean URL resolution, and Network-Only pass-through for Firebase Firestore/Auth.
+// Checklist Fx High-Performance Service Worker (v9)
+// Implements Network-First with Cache Fallback for navigation,
+// Stale-While-Revalidate for app shell, Cache-First for Google Fonts,
+// and Network-Only pass-through for Firebase Firestore/Auth.
 
-const CACHE_NAME = 'checklistfx-pwa-v8';
+const CACHE_NAME = 'checklistfx-pwa-v9';
 const FONT_CACHE_NAME = 'checklistfx-fonts-v1';
 
 const PRECACHE_SHELL = [
@@ -59,7 +60,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate: clean up old cache versions immediately
+// Activate: clean up old cache versions immediately and claim all clients
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -105,47 +106,33 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3. Navigation Requests (HTML Page Transitions): Resilient offline & clean URL handling
+  // 3. Navigation Requests (HTML Page Transitions): Network-First with resilient offline shell fallback
   if (event.request.mode === 'navigate') {
     event.respondWith(
       (async () => {
         const targetHtml = getMatchingHtmlPath(event.request.url);
+        try {
+          const netResp = await fetch(event.request);
+          if (netResp && (netResp.status === 200 || netResp.type === 'opaqueredirect')) {
+            const cache = await caches.open(CACHE_NAME);
+            cache.put(targetHtml, netResp.clone()).catch(() => {});
+            return netResp;
+          }
+        } catch (_) {
+          // Network failed or offline - proceed to cache fallback
+        }
+
+        // Cache fallback for offline mode or non-200 responses
         const cache = await caches.open(CACHE_NAME);
-
-        // Check if target HTML is already cached
-        const cachedHtml = await cache.match(targetHtml, { ignoreSearch: true });
-
-        // Trigger network fetch in background to revalidate
-        const fetchPromise = fetch(event.request)
-          .then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-              cache.put(targetHtml, networkResponse.clone());
-            }
-            return networkResponse;
-          })
-          .catch(() => null);
-
-        // If we already have the cached HTML, return it immediately for instant transitions
-        if (cachedHtml) {
-          fetchPromise.catch(() => {});
-          return cachedHtml;
+        const cached = (await cache.match(targetHtml, { ignoreSearch: true })) ||
+                       (await cache.match(event.request, { ignoreSearch: true })) ||
+                       (await cache.match('./app.html', { ignoreSearch: true })) ||
+                       (await cache.match('./index.html', { ignoreSearch: true }));
+        if (cached) {
+          return cached;
         }
 
-        // Otherwise wait for network response
-        const netResp = await fetchPromise;
-        if (netResp && (netResp.status === 200 || netResp.type === 'opaqueredirect')) {
-          return netResp;
-        }
-
-        // If network failed or returned 404, fallback to cached HTML
-        const fallback = (await cache.match(targetHtml, { ignoreSearch: true })) ||
-                         (await cache.match('./app.html', { ignoreSearch: true })) ||
-                         (await cache.match('./index.html', { ignoreSearch: true }));
-        if (fallback) {
-          return fallback;
-        }
-
-        return netResp || new Response('Offline - Page not found', { status: 404, headers: { 'Content-Type': 'text/plain' } });
+        return new Response('Offline - Page not found', { status: 404, headers: { 'Content-Type': 'text/plain' } });
       })()
     );
     return;
