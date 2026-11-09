@@ -184,12 +184,156 @@ function getUserPreferences() {
     handle: '@jasondma',
     timezone: detectedTz,
     style: 'Momentum + Breakout',
+    currency: 'USD',
+    accountSize: 100000,
+    riskPerTrade: 1.0,
     notifications: true,
     darkMode: true,
     riskReminders: true
   };
 }
 window.getUserPreferences = getUserPreferences;
+
+// Supported Global Forex & Trading Currencies
+const CURRENCY_SYMBOLS = {
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  JPY: '¥',
+  AUD: 'A$',
+  CAD: 'C$',
+  CHF: 'Fr ',
+  NGN: '₦',
+  ZAR: 'R ',
+  INR: '₹',
+  SGD: 'S$',
+  NZD: 'NZ$',
+  AED: 'AED '
+};
+window.CURRENCY_SYMBOLS = CURRENCY_SYMBOLS;
+
+// Default Trading Accounts Archetypes
+const DEFAULT_ACCOUNTS = [
+  { id: 'acc_funded_100k', name: 'Funded Prop', size: 100000, risk: 1.0, currency: 'USD' },
+  { id: 'acc_personal_10k', name: 'Personal Live', size: 10000, risk: 2.0, currency: 'USD' },
+  { id: 'acc_challenge_50k', name: 'Challenge Phase 1', size: 50000, risk: 1.0, currency: 'USD' }
+];
+
+function getTradingAccounts() {
+  try {
+    const raw = localStorage.getItem('dma_trading_accounts');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (_) {}
+  return DEFAULT_ACCOUNTS;
+}
+window.getTradingAccounts = getTradingAccounts;
+
+function saveTradingAccounts(accounts) {
+  try {
+    localStorage.setItem('dma_trading_accounts', JSON.stringify(accounts));
+    if (window.DMA_DB && typeof window.DMA_DB.savePreferences === 'function') {
+      window.DMA_DB.savePreferences({ accounts });
+    }
+    window.dispatchEvent(new CustomEvent('dma-accounts-updated', { detail: accounts }));
+  } catch (err) {
+    console.warn('Failed to save trading accounts:', err);
+  }
+}
+window.saveTradingAccounts = saveTradingAccounts;
+
+function getAppCurrency() {
+  try {
+    const prefs = getUserPreferences();
+    if (prefs && prefs.currency) {
+      return {
+        code: prefs.currency,
+        symbol: CURRENCY_SYMBOLS[prefs.currency] || '$'
+      };
+    }
+  } catch (_) {}
+  return { code: 'USD', symbol: '$' };
+}
+window.getAppCurrency = getAppCurrency;
+
+function formatMoney(amount, options = {}) {
+  const num = Number(amount) || 0;
+  const curr = options.currencySymbol || getAppCurrency().symbol;
+  const decimals = options.decimals !== undefined ? options.decimals : 2;
+  const absFormatted = Math.abs(num).toLocaleString('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+  });
+
+  if (options.noSign) {
+    return `${curr}${absFormatted}`;
+  }
+  if (num > 0) {
+    return `+${curr}${absFormatted}`;
+  }
+  if (num < 0) {
+    return `-${curr}${absFormatted}`;
+  }
+  return `${curr}${absFormatted}`;
+}
+window.formatMoney = formatMoney;
+
+function populateAccountSelects(preferredId) {
+  const accounts = getTradingAccounts();
+  const selectElements = document.querySelectorAll('#log-account-select');
+
+  selectElements.forEach(select => {
+    const currentVal = preferredId || select.value || accounts[0]?.id;
+    select.innerHTML = '';
+
+    accounts.forEach(acc => {
+      const opt = document.createElement('option');
+      opt.value = acc.id;
+      const sym = CURRENCY_SYMBOLS[acc.currency] || '$';
+      const kLabel = acc.size >= 1000 ? `${Math.round(acc.size / 1000)}k` : `${acc.size}`;
+      opt.setAttribute('data-name', `${acc.name} (${sym}${kLabel})`);
+      opt.setAttribute('data-size', acc.size);
+      opt.setAttribute('data-risk', acc.risk);
+      opt.setAttribute('data-currency', acc.currency || 'USD');
+
+      const riskAmt = Math.round(acc.size * (acc.risk / 100));
+      opt.textContent = `${acc.name} (${sym}${Number(acc.size).toLocaleString()} · ${acc.risk}% = ${sym}${riskAmt.toLocaleString()})`;
+      select.appendChild(opt);
+    });
+
+    const customOpt = document.createElement('option');
+    customOpt.value = '__custom_account__';
+    customOpt.textContent = '+ Add / Edit Custom Account...';
+    select.appendChild(customOpt);
+
+    if (currentVal && Array.from(select.options).some(o => o.value === currentVal)) {
+      select.value = currentVal;
+    } else if (select.options.length > 0) {
+      select.selectedIndex = 0;
+    }
+  });
+
+  // Also update journal account filter pills if present
+  const filterGroup = document.getElementById('adv-filter-account');
+  if (filterGroup) {
+    const activePillVal = filterGroup.querySelector('.pill.active')?.getAttribute('data-val') || 'all';
+    filterGroup.innerHTML = '<button class="pill" data-val="all">All Accounts</button>';
+    accounts.forEach(acc => {
+      const btn = document.createElement('button');
+      btn.className = 'pill';
+      btn.setAttribute('data-val', acc.id);
+      const sym = CURRENCY_SYMBOLS[acc.currency] || '$';
+      const kLabel = acc.size >= 1000 ? `${Math.round(acc.size / 1000)}k` : `${acc.size}`;
+      btn.textContent = `${acc.name} (${sym}${kLabel})`;
+      filterGroup.appendChild(btn);
+    });
+    const targetPill = filterGroup.querySelector(`[data-val="${activePillVal}"]`) || filterGroup.querySelector('[data-val="all"]');
+    if (targetPill) targetPill.classList.add('active');
+  }
+}
+window.populateAccountSelects = populateAccountSelects;
 
 function saveUserPreferences(prefs) {
   try {
@@ -379,6 +523,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (selectStyle) selectStyle.value = style;
 
+    // Sync Currency & Account Context
+    const selectCurrency = document.getElementById('profile-currency') || document.getElementById('profile-currency-select');
+    const inputAccountSize = document.getElementById('profile-account-size');
+    const inputRiskPct = document.getElementById('profile-risk-pct');
+    const displayAccount = document.getElementById('profile-account-display') || document.getElementById('profile-active-account-display');
+
+    const accounts = getTradingAccounts();
+    const primaryAcc = accounts[0] || { name: 'Funded Prop', size: 100000, risk: 1.0, currency: 'USD' };
+    const baseCurr = prefs.currency || primaryAcc.currency || 'USD';
+    const sym = CURRENCY_SYMBOLS[baseCurr] || '$';
+
+    if (selectCurrency) selectCurrency.value = baseCurr;
+    if (inputAccountSize) inputAccountSize.value = prefs.accountSize || primaryAcc.size || 100000;
+    if (inputRiskPct) inputRiskPct.value = prefs.riskPerTrade || primaryAcc.risk || 1.0;
+    if (displayAccount) {
+      const accSize = prefs.accountSize || primaryAcc.size || 100000;
+      const accRisk = prefs.riskPerTrade || primaryAcc.risk || 1.0;
+      displayAccount.textContent = `${sym}${Number(accSize).toLocaleString()} (${baseCurr} · ${accRisk}% Risk)`;
+    }
+
     // Sync toggles
     const toggleNotif = document.getElementById('setting-toggle-notifications');
     const toggleDark = document.getElementById('setting-toggle-darkmode');
@@ -446,12 +610,26 @@ document.addEventListener('DOMContentLoaded', () => {
       const nextHandle = rawHandle.startsWith('@') ? rawHandle : '@' + rawHandle;
       const nextTimezone = document.getElementById('profile-timezone')?.value || 'Africa/Lagos';
       const nextStyle = document.getElementById('profile-style')?.value || 'Momentum + Breakout';
+      const nextCurrency = document.getElementById('profile-currency')?.value || getUserPreferences().currency || 'USD';
+      const nextAccountSize = parseFloat(document.getElementById('profile-account-size')?.value) || getUserPreferences().accountSize || 100000;
+      const nextRiskPct = parseFloat(document.getElementById('profile-risk-pct')?.value) || getUserPreferences().riskPerTrade || 1.0;
+
+      const accounts = getTradingAccounts();
+      if (accounts.length > 0) {
+        accounts[0].size = nextAccountSize;
+        accounts[0].risk = nextRiskPct;
+        accounts[0].currency = nextCurrency;
+        saveTradingAccounts(accounts);
+      }
 
       saveUserPreferences({
         name: nextName,
         handle: nextHandle,
         timezone: nextTimezone,
-        style: nextStyle
+        style: nextStyle,
+        currency: nextCurrency,
+        accountSize: nextAccountSize,
+        riskPerTrade: nextRiskPct
       });
 
       syncGlobalUserContext();
@@ -551,22 +729,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (netPnlEl) {
         if (!hasTrades) {
-          netPnlEl.textContent = '$0.00';
+          netPnlEl.textContent = formatMoney(0, { noSign: true });
           netPnlEl.className = 'net-pnl neutral';
         } else {
-          netPnlEl.textContent = totalNet >= 0 
-            ? `+$${totalNet.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
-            : `-$${Math.abs(totalNet).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          netPnlEl.textContent = formatMoney(totalNet);
           netPnlEl.className = `net-pnl ${totalNet >= 0 ? 'green' : 'red'}`;
         }
       }
 
       if (labelFollowed) {
-        labelFollowed.textContent = `+$${totalFollowed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        labelFollowed.textContent = formatMoney(totalFollowed);
       }
 
       if (labelBroken) {
-        labelBroken.textContent = `-$${Math.abs(totalBroken).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        labelBroken.textContent = formatMoney(-Math.abs(totalBroken));
       }
 
       if (barGood && barBad) {
@@ -655,9 +831,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const card = document.createElement('div');
       const isWin = Number(t.pnl) >= 0;
       const pnlNum = Number(t.pnl) || 0;
-      const pnlFormatted = isWin 
-        ? `+$${pnlNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
-        : `-$${Math.abs(pnlNum).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const tradeSym = t.currencySymbol || (t.currency && CURRENCY_SYMBOLS[t.currency]) || getAppCurrency().symbol;
+      const pnlFormatted = formatMoney(pnlNum, { currencySymbol: tradeSym });
       const rMult = t.rMultiple || (isWin ? '+2.2R' : '-1.0R');
       const strategyTitle = t.strategy || (t.strategyKey === 'trend' ? 'Trend Continuation' : (t.strategyKey === 'impulse' ? 'Impulse Entry' : 'A+ Reversal'));
 
@@ -1020,12 +1195,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (netPnlEl) {
         if (visibleCount === 0) {
-          netPnlEl.textContent = '$0.00';
+          netPnlEl.textContent = formatMoney(0, { noSign: true });
           netPnlEl.className = 'digest-val';
         } else {
-          netPnlEl.textContent = (netPnl >= 0 
-            ? `+$${netPnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
-            : `-$${Math.abs(netPnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+          netPnlEl.textContent = formatMoney(netPnl);
           netPnlEl.className = `digest-val ${netPnl >= 0 ? 'green' : 'red'}`;
         }
       }
@@ -1062,8 +1235,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (fomoTaxEl) {
         fomoTaxEl.textContent = fomoTax > 0 
-          ? `-$${fomoTax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
-          : '$0.00';
+          ? formatMoney(-Math.abs(fomoTax)) 
+          : formatMoney(0, { noSign: true });
       }
 
       updateDateHeaders();
@@ -1090,9 +1263,7 @@ document.addEventListener('DOMContentLoaded', () => {
         header.style.display = hasVisible ? 'flex' : 'none';
         const statEl = header.querySelector('.date-group-stat');
         if (statEl && hasVisible) {
-          const formattedNet = groupNet >= 0 
-            ? `+$${groupNet.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
-            : `-$${Math.abs(groupNet).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          const formattedNet = formatMoney(groupNet);
           const colorClass = groupNet >= 0 ? 'green' : 'red';
           statEl.innerHTML = `Net: <b class="${colorClass}">${formattedNet}</b> · ${groupCount} trade${groupCount === 1 ? '' : 's'}`;
         }
@@ -1372,9 +1543,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (pnlValEl) {
-        pnlValEl.textContent = (isWin 
-          ? `+$${pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
-          : `-$${Math.abs(pnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+        pnlValEl.textContent = formatMoney(pnl);
         pnlValEl.className = `inspector-pnl-val ${isWin ? 'green' : 'red'}`;
       }
 
@@ -2161,7 +2330,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const netFollowed = b.baseFollowed + addedFollowedPnl;
     const netFomoTax = Math.max(0, netFollowed - netActual);
 
-    const fmt = (num) => num >= 0 ? `+$${Math.round(num).toLocaleString('en-US')}` : `-$${Math.round(Math.abs(num)).toLocaleString('en-US')}`;
+    const fmt = (num) => formatMoney(Math.round(num), { decimals: 0 });
 
     const finalWk = b.weeks[b.weeks.length - 1];
     finalWk.actual = netActual;
@@ -2173,7 +2342,7 @@ document.addEventListener('DOMContentLoaded', () => {
         label: w.label,
         actual: fmt(w.actual),
         ideal: fmt(w.ideal),
-        gap: g >= 0 ? fmt(g) : `-$${Math.round(Math.abs(g)).toLocaleString('en-US')}`,
+        gap: g >= 0 ? fmt(g) : formatMoney(-Math.round(Math.abs(g)), { decimals: 0 }),
         scrubX: w.scrubX
       };
     });
@@ -2213,27 +2382,27 @@ document.addEventListener('DOMContentLoaded', () => {
         ? `<strong>${compliantTrades} of ${totalTrades}</strong> trades followed 100% of confluences.`
         : '<strong>0 of 0</strong> trades logged. Complete a trade to unlock audit.',
       leak: totalTrades > 0 ? `${brokenTrades} trades with broken rules` : '0 rule violations',
-      actual: totalTrades > 0 ? fmt(netActual) : '$0.00',
-      followed: totalTrades > 0 ? fmt(netFollowed) : '$0.00',
-      fomoTax: totalTrades > 0 ? `$${Math.round(netFomoTax).toLocaleString('en-US')}` : '$0.00',
+      actual: totalTrades > 0 ? fmt(netActual) : formatMoney(0, { noSign: true, decimals: 0 }),
+      followed: totalTrades > 0 ? fmt(netFollowed) : formatMoney(0, { noSign: true, decimals: 0 }),
+      fomoTax: totalTrades > 0 ? formatMoney(Math.round(netFomoTax), { noSign: true, decimals: 0 }) : formatMoney(0, { noSign: true, decimals: 0 }),
       weeks: weeksFormatted,
       xLabels: b.xLabels,
       polyActual: actualPoints,
       polyIdeal: idealPoints,
       m1: {
         count: `${b.m1.count} Occurrences`,
-        leak: b.m1.count > 0 ? `-$${Math.round(Math.abs(b.m1.cost) / (b.m1.count || 1))} / breach` : '$0.00 / breach',
-        cost: b.m1.count > 0 ? fmt(b.m1.cost) : '$0.00'
+        leak: b.m1.count > 0 ? `${formatMoney(-Math.round(Math.abs(b.m1.cost) / (b.m1.count || 1)), { decimals: 0 })} / breach` : `${formatMoney(0, { noSign: true, decimals: 0 })} / breach`,
+        cost: b.m1.count > 0 ? fmt(b.m1.cost) : formatMoney(0, { noSign: true, decimals: 0 })
       },
       m2: {
         count: `${b.m2.count} Occurrences`,
-        leak: b.m2.count > 0 ? `-$${Math.round(Math.abs(b.m2.cost) / (b.m2.count || 1))} / breach` : '$0.00 / breach',
-        cost: b.m2.count > 0 ? fmt(b.m2.cost) : '$0.00'
+        leak: b.m2.count > 0 ? `${formatMoney(-Math.round(Math.abs(b.m2.cost) / (b.m2.count || 1)), { decimals: 0 })} / breach` : `${formatMoney(0, { noSign: true, decimals: 0 })} / breach`,
+        cost: b.m2.count > 0 ? fmt(b.m2.cost) : formatMoney(0, { noSign: true, decimals: 0 })
       },
       m3: {
         count: `${b.m3.count} Occurrences`,
-        leak: b.m3.count > 0 ? `-$${Math.round(Math.abs(b.m3.cost) / (b.m3.count || 1))} / breach` : '$0.00 / breach',
-        cost: b.m3.count > 0 ? fmt(b.m3.cost) : '$0.00'
+        leak: b.m3.count > 0 ? `${formatMoney(-Math.round(Math.abs(b.m3.cost) / (b.m3.count || 1)), { decimals: 0 })} / breach` : `${formatMoney(0, { noSign: true, decimals: 0 })} / breach`,
+        cost: b.m3.count > 0 ? fmt(b.m3.cost) : formatMoney(0, { noSign: true, decimals: 0 })
       },
       edges: (() => {
         let followedWins = 0;
@@ -2686,6 +2855,16 @@ function openLogTradeModal() {
   const lessonsInput = document.getElementById('log-debrief-lessons-input');
   if (lessonsInput) lessonsInput.value = '';
 
+  if (typeof populateAccountSelects === 'function') {
+    populateAccountSelects();
+  }
+  const quickEditor = document.getElementById('account-quick-editor');
+  if (quickEditor) quickEditor.style.display = 'none';
+
+  if (typeof setPnlSign === 'function') {
+    setPnlSign(activePnlSign || '+');
+  }
+
   if (typeof updateAccountImpactReadout === 'function') {
     updateAccountImpactReadout();
   }
@@ -2971,23 +3150,32 @@ if (logStrategySelect) {
 
 // P&L Sign Toggle (+ / -)
 let activePnlSign = '+';
-const pnlSignBtns = document.querySelectorAll('#pnl-sign-toggle .sign-btn');
-pnlSignBtns.forEach(btn => {
-  btn.addEventListener('click', () => {
-    pnlSignBtns.forEach(b => {
-      b.classList.remove('active');
-      b.classList.remove('pos');
-      b.classList.remove('neg');
-    });
-    btn.classList.add('active');
-    activePnlSign = btn.getAttribute('data-sign') || '+';
-    if (activePnlSign === '+') {
-      btn.classList.add('pos');
-    } else {
-      btn.classList.add('neg');
+
+function setPnlSign(sign) {
+  activePnlSign = (sign === '-' || sign === 'neg' || sign === 'loss') ? '-' : '+';
+  document.querySelectorAll('#pnl-sign-toggle .sign-btn, .pnl-sign-toggle .sign-btn').forEach(b => {
+    const s = b.getAttribute('data-sign');
+    const isActive = (s === activePnlSign);
+    b.classList.toggle('active', isActive);
+    b.classList.remove('pos', 'neg');
+    if (isActive) {
+      b.classList.add(activePnlSign === '+' ? 'pos' : 'neg');
     }
-    updateAccountImpactReadout();
   });
+  if (typeof updateAccountImpactReadout === 'function') {
+    updateAccountImpactReadout();
+  }
+}
+window.setPnlSign = setPnlSign;
+
+// Delegated click/touch handling for sign buttons to guarantee instant tapping anywhere
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('#pnl-sign-toggle .sign-btn, .pnl-sign-toggle .sign-btn');
+  if (btn) {
+    e.preventDefault();
+    const sign = btn.getAttribute('data-sign') || '+';
+    setPnlSign(sign);
+  }
 });
 
 // Live Multi-Account Sizing & Normalized Impact Readout
@@ -2999,13 +3187,22 @@ function updateAccountImpactReadout() {
   const pnlInput = document.getElementById('trade-pnl-input');
 
   const opt = accountSelect?.options[accountSelect.selectedIndex];
+  if (!opt || opt.value === '__custom_account__') return;
+
   const accSize = parseFloat(opt?.getAttribute('data-size')) || 100000;
   const riskPercent = parseFloat(opt?.getAttribute('data-risk')) || 1.0;
+  const accCurrency = opt?.getAttribute('data-currency') || getAppCurrency().code;
+  const currSym = CURRENCY_SYMBOLS[accCurrency] || getAppCurrency().symbol;
   const riskDollars = accSize * (riskPercent / 100);
 
   if (riskPill) {
-    riskPill.textContent = `${riskPercent.toFixed(1)}% Risk ($${Math.round(riskDollars).toLocaleString()})`;
+    riskPill.textContent = `${riskPercent.toFixed(1)}% Risk (${currSym}${Math.round(riskDollars).toLocaleString()})`;
   }
+
+  // Live Currency Symbol Prefix in the Realized P&L input wrap
+  document.querySelectorAll('#log-trade-modal .currency-symbol, .dollar-input-wrap .currency-symbol').forEach(el => {
+    el.textContent = currSym;
+  });
 
   const pnlRaw = Math.abs(parseFloat(pnlInput?.value) || 0);
   const pnlFinal = activePnlSign === '-' ? -pnlRaw : pnlRaw;
@@ -3024,15 +3221,183 @@ function updateAccountImpactReadout() {
     impactREl.style.color = pnlFinal > 0 ? '#10b981' : (pnlFinal < 0 ? '#f43f5e' : '#38bdf8');
   }
 }
+window.updateAccountImpactReadout = updateAccountImpactReadout;
 
 const logAccountSelect = document.getElementById('log-account-select');
 if (logAccountSelect) {
-  logAccountSelect.addEventListener('change', updateAccountImpactReadout);
+  logAccountSelect.addEventListener('change', () => {
+    if (logAccountSelect.value === '__custom_account__') {
+      const editor = document.getElementById('account-quick-editor');
+      if (editor) editor.style.display = 'block';
+    } else {
+      updateAccountImpactReadout();
+    }
+  });
 }
 
 const tradePnlInput = document.getElementById('trade-pnl-input');
 if (tradePnlInput) {
-  tradePnlInput.addEventListener('input', updateAccountImpactReadout);
+  tradePnlInput.addEventListener('input', () => {
+    let raw = tradePnlInput.value;
+    if (typeof raw === 'string') {
+      if (raw.includes('-')) {
+        setPnlSign('-');
+        tradePnlInput.value = raw.replace(/-/g, '');
+      } else if (raw.includes('+')) {
+        setPnlSign('+');
+        tradePnlInput.value = raw.replace(/\+/g, '');
+      }
+    }
+    updateAccountImpactReadout();
+  });
+}
+
+// Quick Account Size & Currency Editor Controller
+function initQuickAccountEditor() {
+  const toggleBtn = document.getElementById('account-edit-toggle-btn');
+  const editorPanel = document.getElementById('account-quick-editor');
+  const closeBtn = document.getElementById('account-editor-close-btn');
+  const applyBtn = document.getElementById('quick-account-apply-btn');
+  const saveNewBtn = document.getElementById('quick-account-save-as-new-btn');
+  const sizeInput = document.getElementById('quick-account-size-input');
+  const riskInput = document.getElementById('quick-account-risk-input');
+  const currSelect = document.getElementById('quick-account-currency-select');
+  const nameInput = document.getElementById('quick-account-name-input');
+  const currTag = document.getElementById('quick-edit-curr-tag');
+  const accountSelect = document.getElementById('log-account-select');
+
+  function openEditor() {
+    if (!editorPanel) return;
+    const selectedOpt = accountSelect?.options[accountSelect.selectedIndex];
+    const isCustom = selectedOpt?.value === '__custom_account__';
+
+    const currentSize = isCustom ? 50000 : (parseFloat(selectedOpt?.getAttribute('data-size')) || 100000);
+    const currentRisk = isCustom ? 1.0 : (parseFloat(selectedOpt?.getAttribute('data-risk')) || 1.0);
+    const currentCurr = isCustom ? getAppCurrency().code : (selectedOpt?.getAttribute('data-currency') || getAppCurrency().code);
+    const currentName = isCustom ? 'Custom Account' : (selectedOpt?.getAttribute('data-name')?.replace(/\s*\(.*\)$/, '') || 'My Account');
+
+    if (sizeInput) sizeInput.value = currentSize;
+    if (riskInput) riskInput.value = currentRisk;
+    if (currSelect) currSelect.value = currentCurr;
+    if (nameInput) nameInput.value = currentName;
+    if (currTag) currTag.textContent = CURRENCY_SYMBOLS[currentCurr] || '$';
+
+    editorPanel.style.display = 'block';
+  }
+
+  function closeEditor() {
+    if (!editorPanel) return;
+    editorPanel.style.display = 'none';
+    if (accountSelect && accountSelect.value === '__custom_account__') {
+      accountSelect.selectedIndex = 0;
+      updateAccountImpactReadout();
+    }
+  }
+
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (editorPanel && editorPanel.style.display === 'block') {
+        closeEditor();
+      } else {
+        openEditor();
+      }
+    });
+  }
+
+  if (closeBtn) {
+    closeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      closeEditor();
+    });
+  }
+
+  if (currSelect) {
+    currSelect.addEventListener('change', () => {
+      const sym = CURRENCY_SYMBOLS[currSelect.value] || '$';
+      if (currTag) currTag.textContent = sym;
+    });
+  }
+
+  if (applyBtn) {
+    applyBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const accounts = getTradingAccounts();
+      const selectedId = accountSelect?.value;
+      const targetAcc = accounts.find(a => a.id === selectedId) || accounts[0];
+
+      const newSize = parseFloat(sizeInput?.value) || 100000;
+      const newRisk = parseFloat(riskInput?.value) || 1.0;
+      const newCurr = currSelect?.value || 'USD';
+      const newName = nameInput?.value?.trim() || targetAcc.name || 'Trading Account';
+
+      targetAcc.name = newName;
+      targetAcc.size = newSize;
+      targetAcc.risk = newRisk;
+      targetAcc.currency = newCurr;
+
+      saveTradingAccounts(accounts);
+      saveUserPreferences({ currency: newCurr, accountSize: newSize, riskPerTrade: newRisk });
+      populateAccountSelects(targetAcc.id);
+      closeEditor();
+      updateAccountImpactReadout();
+
+      if (typeof showAppToast === 'function') {
+        showAppToast({
+          title: 'Account Context Updated',
+          message: `${newName} set to ${CURRENCY_SYMBOLS[newCurr] || '$'}${newSize.toLocaleString()} (${newRisk}% Risk)`,
+          type: 'success',
+          duration: 3500
+        });
+      }
+    });
+  }
+
+  if (saveNewBtn) {
+    saveNewBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const accounts = getTradingAccounts();
+      const newSize = parseFloat(sizeInput?.value) || 100000;
+      const newRisk = parseFloat(riskInput?.value) || 1.0;
+      const newCurr = currSelect?.value || 'USD';
+      const newName = nameInput?.value?.trim() || `Account ${accounts.length + 1}`;
+      const newId = `acc_${Date.now()}`;
+
+      const newAcc = {
+        id: newId,
+        name: newName,
+        size: newSize,
+        risk: newRisk,
+        currency: newCurr
+      };
+
+      accounts.push(newAcc);
+      saveTradingAccounts(accounts);
+      saveUserPreferences({ currency: newCurr });
+      populateAccountSelects(newId);
+      closeEditor();
+      updateAccountImpactReadout();
+
+      if (typeof showAppToast === 'function') {
+        showAppToast({
+          title: 'New Account Created',
+          message: `${newName} (${CURRENCY_SYMBOLS[newCurr] || '$'}${newSize.toLocaleString()}) added and selected.`,
+          type: 'success',
+          duration: 3500
+        });
+      }
+    });
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    populateAccountSelects();
+    initQuickAccountEditor();
+  });
+} else {
+  populateAccountSelects();
+  initQuickAccountEditor();
 }
 
 // TradingView Screenshot Preview & Paste
@@ -3197,6 +3562,10 @@ if (logTradeForm) {
       rMultiple,
       accountId,
       accountName,
+      accountSize,
+      accountRiskPct,
+      currency: selectedOpt?.getAttribute('data-currency') || getAppCurrency().code,
+      currencySymbol: CURRENCY_SYMBOLS[selectedOpt?.getAttribute('data-currency')] || getAppCurrency().symbol,
       confluencesMet: met,
       totalConfluences: total,
       confluences: confluencesList,
@@ -3252,14 +3621,14 @@ if (logTradeForm) {
     if (isCompliant) {
       showAppToast({
         title: 'Audited Trade Committed!',
-        message: `${asset} ${direction} (${pnlFinal >= 0 ? '+$' + pnlFinal : '-$' + Math.abs(pnlFinal)})\nGrade: ${debriefData.grade} (${debriefData.emotion}) · 100% Plan Compliance (${met}/${total} Confluences Verified).`,
+        message: `${asset} ${direction} (${formatMoney(pnlFinal)})\nGrade: ${debriefData.grade} (${debriefData.emotion}) · 100% Plan Compliance (${met}/${total} Confluences Verified).`,
         type: 'success',
         duration: 5000
       });
     } else {
       showAppToast({
         title: 'Trade Logged (Rule Breach)',
-        message: `${asset} ${direction} (${pnlFinal >= 0 ? '+$' + pnlFinal : '-$' + Math.abs(pnlFinal)})\nGrade: ${debriefData.grade} (${debriefData.emotion}) · Missing ${total - met} of ${total} confluences. Logged under Rules Broken.`,
+        message: `${asset} ${direction} (${formatMoney(pnlFinal)})\nGrade: ${debriefData.grade} (${debriefData.emotion}) · Missing ${total - met} of ${total} confluences. Logged under Rules Broken.`,
         type: 'warning',
         duration: 5500
       });
@@ -3299,7 +3668,7 @@ function saveTradeDraft() {
     strategy: strategySelect ? strategySelect.value : '',
     direction: activeDirBtn ? activeDirBtn.getAttribute('data-direction') : 'long',
     pnl: pnlInput ? pnlInput.value : '',
-    pnlSign: signToggle ? signToggle.textContent.trim() : '+',
+    pnlSign: activePnlSign || '+',
     screenshot: screenshotInput ? screenshotInput.value : '',
     grade: typeof activeLogGrade !== 'undefined' ? activeLogGrade : 'A+',
     gradeTitle: typeof activeLogGradeTitle !== 'undefined' ? activeLogGradeTitle : '',
@@ -3366,8 +3735,9 @@ function restoreTradeDraft() {
     const pnlInput = document.getElementById('trade-pnl-input');
     if (pnlInput && draft.pnl) pnlInput.value = draft.pnl;
 
-    const signToggle = document.getElementById('pnl-sign-toggle');
-    if (signToggle && draft.pnlSign) signToggle.textContent = draft.pnlSign;
+    if (draft.pnlSign && typeof setPnlSign === 'function') {
+      setPnlSign(draft.pnlSign);
+    }
 
     const screenshotInput = document.getElementById('trade-screenshot-url');
     if (screenshotInput && draft.screenshot) screenshotInput.value = draft.screenshot;
@@ -3549,19 +3919,23 @@ const playbookRegistry = {};
  * Returns effective playbooks (custom user playbooks only)
  */
 function getEffectivePlaybooks() {
-  const deletedIds = JSON.parse(localStorage.getItem('dma_deleted_playbooks') || '[]');
+  const deletedIds = JSON.parse(localStorage.getItem('dma_deleted_playbooks') || '[]').map(String);
   const customSaved = JSON.parse(localStorage.getItem('dma_custom_playbooks') || '[]');
 
   const list = [];
 
   // Include user custom playbooks
   customSaved.forEach(cp => {
-    if (!deletedIds.includes(cp.id) && !list.some(item => item.id === cp.id)) {
-      list.push(cp);
-      playbookRegistry[cp.id] = cp;
-      tradeStrategies[cp.id] = {
-        name: cp.name,
-        confluences: cp.confluences
+    const cpId = String(cp.id || cp.key || '').trim();
+    if (!cpId) return;
+    if (!deletedIds.includes(cpId) && !list.some(item => String(item.id) === cpId)) {
+      const normalizedCp = { ...cp, id: cpId };
+      list.push(normalizedCp);
+      playbookRegistry[cpId] = normalizedCp;
+      if (cp.id !== cpId) playbookRegistry[cp.id] = normalizedCp;
+      tradeStrategies[cpId] = {
+        name: normalizedCp.name,
+        confluences: normalizedCp.confluences
       };
     }
   });
@@ -3582,9 +3956,9 @@ function getPlaybookRealStats(playbookId, playbookName, setupType) {
 
   const pbTrades = trades.filter(t => {
     if (!t) return false;
-    if (t.strategyKey && t.strategyKey === playbookId) return true;
+    if (t.strategyKey && String(t.strategyKey) === String(playbookId)) return true;
     if (t.strategy && playbookName && t.strategy.toLowerCase() === playbookName.toLowerCase()) return true;
-    if (setupType && t.strategyKey === setupType && !String(t.strategyKey).startsWith('custom_')) return true;
+    if (setupType && String(t.strategyKey) === String(setupType) && !String(t.strategyKey).startsWith('custom_')) return true;
     return false;
   });
 
@@ -3683,10 +4057,13 @@ function renderDashboardPlaybooks(force = false) {
 
   const playbooks = getEffectivePlaybooks();
   const currentHash = JSON.stringify(playbooks.map(p => ({
-    id: p.id,
+    id: String(p.id),
     name: p.name,
     wr: p.wr,
-    confluencesCount: p.confluences ? p.confluences.length : 0
+    pnl: p.pnl,
+    type: p.setupType,
+    targetRr: p.targetRr || p.targetRR || '1:2.5',
+    confluences: p.confluences || []
   })));
 
   if (!force && (container.children?.length || 0) > 0 && lastRenderedPlaybooksHash === currentHash) {
@@ -3745,10 +4122,35 @@ function openPlaybookDetailModal(playbookId) {
   const backdrop = document.getElementById('playbook-detail-backdrop');
   if (!modal || !backdrop) return;
 
-  const pb = playbookRegistry[playbookId];
+  const targetId = (playbookId != null && String(playbookId).trim() !== '') ? String(playbookId).trim() : null;
+  if (!targetId) return;
+
+  let pb = playbookRegistry[targetId] || playbookRegistry[playbookId];
+  if (!pb) {
+    try {
+      const customSaved = JSON.parse(localStorage.getItem('dma_custom_playbooks') || '[]');
+      pb = customSaved.find(p => String(p.id) === targetId || String(p.key) === targetId);
+      if (pb) playbookRegistry[targetId] = pb;
+    } catch (_) {}
+  }
+  if (!pb && typeof benchmarkPlaybooks !== 'undefined' && benchmarkPlaybooks[targetId]) {
+    pb = benchmarkPlaybooks[targetId];
+    playbookRegistry[targetId] = pb;
+  }
+  if (!pb && typeof tradeStrategies !== 'undefined' && tradeStrategies[targetId]) {
+    const ts = tradeStrategies[targetId];
+    pb = {
+      id: targetId,
+      name: ts.name,
+      setupType: targetId === 'trend' ? 'trend' : (targetId === 'breakout' ? 'breakout' : 'reversal'),
+      targetRr: '1:2.5',
+      confluences: ts.confluences || []
+    };
+    playbookRegistry[targetId] = pb;
+  }
   if (!pb) return;
 
-  activeInspectingPlaybookId = playbookId;
+  activeInspectingPlaybookId = targetId;
   const realStats = getPlaybookRealStats(pb.id, pb.name, pb.setupType);
 
   // Header & Title
@@ -3897,12 +4299,12 @@ if (pbDeleteBtn) {
     // 2. Update localStorage immediately
     try {
       const customSaved = JSON.parse(localStorage.getItem('dma_custom_playbooks') || '[]');
-      const filtered = customSaved.filter(item => item.id !== targetId);
+      const filtered = customSaved.filter(item => String(item.id) !== String(targetId) && String(item.key) !== String(targetId));
       localStorage.setItem('dma_custom_playbooks', JSON.stringify(filtered));
 
       const deletedIds = JSON.parse(localStorage.getItem('dma_deleted_playbooks') || '[]');
-      if (!deletedIds.includes(targetId)) {
-        deletedIds.push(targetId);
+      if (!deletedIds.map(String).includes(String(targetId))) {
+        deletedIds.push(String(targetId));
         localStorage.setItem('dma_deleted_playbooks', JSON.stringify(deletedIds));
       }
 
@@ -3925,12 +4327,10 @@ if (pbDeleteBtn) {
       window.refreshPlaybookGrid(true);
     }
 
-    // 5. Remove from Log Strategy Dropdown & Pills
-    const opt = document.querySelector(`#log-strategy-select option[value="${targetId}"]`);
-    if (opt) opt.remove();
-
-    const pill = document.querySelector(`#log-strategy-group .strategy-pill[data-strategy="${targetId}"]`);
-    if (pill) pill.remove();
+    // 5. Synchronize strategy choices in logger dropdown
+    if (typeof loadSavedPlaybooks === 'function') {
+      loadSavedPlaybooks();
+    }
 
     showAppToast({
       title: 'Playbook Deleted',
@@ -3962,9 +4362,42 @@ function openChecklistCreatorModal(editPlaybookId = null) {
   const rrInput = document.getElementById('creator-target-rr');
   const typePills = document.querySelectorAll('#creator-type-group .pill, #creator-type-pills .pill');
 
-  if (typeof editPlaybookId === 'string' && playbookRegistry[editPlaybookId]) {
-    currentEditingPlaybookId = editPlaybookId;
-    const pb = playbookRegistry[editPlaybookId];
+  const targetId = (editPlaybookId != null && String(editPlaybookId).trim() !== '') ? String(editPlaybookId).trim() : null;
+  let pb = null;
+
+  if (targetId) {
+    if (playbookRegistry[targetId]) {
+      pb = playbookRegistry[targetId];
+    }
+    if (!pb && playbookRegistry[editPlaybookId]) {
+      pb = playbookRegistry[editPlaybookId];
+    }
+    if (!pb) {
+      try {
+        const customSaved = JSON.parse(localStorage.getItem('dma_custom_playbooks') || '[]');
+        pb = customSaved.find(p => String(p.id) === targetId || String(p.key) === targetId);
+        if (pb) playbookRegistry[targetId] = pb;
+      } catch (_) {}
+    }
+    if (!pb && typeof benchmarkPlaybooks !== 'undefined' && benchmarkPlaybooks[targetId]) {
+      pb = benchmarkPlaybooks[targetId];
+      playbookRegistry[targetId] = pb;
+    }
+    if (!pb && typeof tradeStrategies !== 'undefined' && tradeStrategies[targetId]) {
+      const ts = tradeStrategies[targetId];
+      pb = {
+        id: targetId,
+        name: ts.name,
+        setupType: targetId === 'trend' ? 'trend' : (targetId === 'breakout' ? 'breakout' : 'reversal'),
+        targetRr: '1:2.5',
+        confluences: ts.confluences || []
+      };
+      playbookRegistry[targetId] = pb;
+    }
+  }
+
+  if (targetId && pb) {
+    currentEditingPlaybookId = targetId;
 
     if (modalTitle) modalTitle.textContent = 'EDIT PLAYBOOK MODEL';
     if (modalBadge) {
@@ -3974,7 +4407,7 @@ function openChecklistCreatorModal(editPlaybookId = null) {
     if (submitBtn) submitBtn.textContent = 'UPDATE PLAYBOOK';
 
     if (nameInput) nameInput.value = pb.name || '';
-    if (rrInput) rrInput.value = pb.targetRr || '1:2.5';
+    if (rrInput) rrInput.value = pb.targetRr || pb.targetRR || '1:2.5';
 
     const currentType = (pb.setupType || 'reversal').toLowerCase();
     typePills.forEach(p => {
@@ -4071,9 +4504,14 @@ function appendRuleRow(initialValue = '', customPlaceholder = '') {
   row.className = 'creator-rule-row';
   row.innerHTML = `
     <span class="rule-num">${currentCount + 1}</span>
-    <input type="text" class="rule-input" value="${initialValue}" placeholder="${placeholder}" required>
+    <input type="text" class="rule-input" placeholder="${String(placeholder).replace(/"/g, '&quot;')}" required>
     <button type="button" class="rule-remove-btn" aria-label="Remove">✕</button>
   `;
+
+  const input = row.querySelector('.rule-input');
+  if (input && initialValue) {
+    input.value = initialValue;
+  }
 
   row.querySelector('.rule-remove-btn').addEventListener('click', () => {
     const allRows = creatorRulesContainer.querySelectorAll('.creator-rule-row');
@@ -4179,8 +4617,8 @@ if (checklistCreatorForm) {
 
     if (currentEditingPlaybookId) {
       // EDIT MODE
-      const targetId = currentEditingPlaybookId;
-      const existing = playbookRegistry[targetId] || {};
+      const targetId = String(currentEditingPlaybookId);
+      let existing = playbookRegistry[targetId] || {};
       existing.id = targetId;
       existing.name = name;
       existing.setupType = setupType;
@@ -4196,15 +4634,34 @@ if (checklistCreatorForm) {
 
       try {
         let customSaved = JSON.parse(localStorage.getItem('dma_custom_playbooks') || '[]');
-        const idx = customSaved.findIndex(item => item.id === targetId);
+        const idx = customSaved.findIndex(item => String(item.id) === targetId || String(item.key) === targetId);
         if (idx !== -1) {
-          customSaved[idx] = existing;
+          customSaved[idx] = { ...customSaved[idx], ...existing };
         } else {
           customSaved.push(existing);
         }
         localStorage.setItem('dma_custom_playbooks', JSON.stringify(customSaved));
+
+        // Update trade strategy names in logged trades if any
+        let trades = JSON.parse(localStorage.getItem('dma_trades') || '[]');
+        let tradesModified = false;
+        trades = trades.map(t => {
+          if (t && String(t.strategyKey) === targetId && t.strategy !== name) {
+            tradesModified = true;
+            return { ...t, strategy: name };
+          }
+          return t;
+        });
+        if (tradesModified) {
+          localStorage.setItem('dma_trades', JSON.stringify(trades));
+        }
       } catch (err) {
         console.warn('Storage error', err);
+      }
+
+      // Synchronize dropdowns across all modals and pages
+      if (typeof loadSavedPlaybooks === 'function') {
+        loadSavedPlaybooks();
       }
 
       if (window.DMA_DB && typeof window.DMA_DB.savePlaybook === 'function') {
@@ -4326,17 +4783,9 @@ if (checklistCreatorForm) {
       });
     }
 
-    // Live update on Dashboard
-    if (typeof window.renderDashboardPlaybooks === 'function') renderDashboardPlaybooks(true);
-
-    // Also update Log Strategy Select
-    const logStrategySelect = document.getElementById('log-strategy-select');
-    if (logStrategySelect) {
-      const opt = document.createElement('option');
-      opt.value = newId;
-      opt.textContent = name;
-      logStrategySelect.appendChild(opt);
-      logStrategySelect.value = newId;
+    // Synchronize strategy choices across app
+    if (typeof loadSavedPlaybooks === 'function') {
+      loadSavedPlaybooks();
     }
 
     closeChecklistCreatorModal();
@@ -4350,19 +4799,22 @@ if (checklistCreatorForm) {
 function loadSavedPlaybooks() {
   try {
     // 1. Prune any built-in playbooks that were marked deleted
-    const deletedIds = JSON.parse(localStorage.getItem('dma_deleted_playbooks') || '[]');
+    const deletedIds = JSON.parse(localStorage.getItem('dma_deleted_playbooks') || '[]').map(String);
     deletedIds.forEach(delId => {
       delete playbookRegistry[delId];
       delete tradeStrategies[delId];
     });
 
     // 2. Render playbooks container on Dashboard
-    renderDashboardPlaybooks();
+    if (typeof renderDashboardPlaybooks === 'function') {
+      renderDashboardPlaybooks(true);
+    }
 
     // 3. Populate strategy choices in logger
     const logStrategySelect = document.getElementById('log-strategy-select');
     if (logStrategySelect) {
       const effective = getEffectivePlaybooks();
+      const currentSelected = logStrategySelect.value;
       logStrategySelect.innerHTML = '';
       if (effective.length === 0) {
         const opt = document.createElement('option');
@@ -4377,11 +4829,15 @@ function loadSavedPlaybooks() {
           logStrategySelect.appendChild(opt);
         });
       }
+      if (currentSelected && logStrategySelect.querySelector(`option[value="${currentSelected}"]`)) {
+        logStrategySelect.value = currentSelected;
+      }
     }
   } catch (err) {
     console.warn('Could not load playbooks', err);
   }
 }
+window.loadSavedPlaybooks = loadSavedPlaybooks;
 
 // Initial bindings
 loadSavedPlaybooks();
@@ -4409,7 +4865,15 @@ function initPlaybookWorkstation() {
   function renderGrid(force = false) {
     const playbooks = getActivePlaybooks();
     const q = searchQuery.toLowerCase().trim();
-    const currentHash = `${activeFilter}|${q}|${JSON.stringify(playbooks.map(p => ({ id: p.id, name: p.name, wr: p.wr, pnl: p.pnl, type: p.setupType })))}`;
+    const currentHash = `${activeFilter}|${q}|${JSON.stringify(playbooks.map(p => ({
+      id: String(p.id),
+      name: p.name,
+      wr: p.wr,
+      pnl: p.pnl,
+      type: p.setupType,
+      targetRr: p.targetRr || p.targetRR || '1:2.5',
+      confluences: p.confluences || []
+    })))}`;
 
     if (!force && (grid.children?.length || 0) > 0 && lastRenderedGridHash === currentHash) {
       return; // Skip destructive wipe if state is identical

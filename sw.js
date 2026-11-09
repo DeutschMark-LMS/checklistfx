@@ -1,8 +1,8 @@
-// Checklist Fx High-Performance Service Worker (v3)
+// Checklist Fx High-Performance Service Worker (v5)
 // Implements Stale-While-Revalidate for app shell, Cache-First for Google Fonts,
 // and Network-Only pass-through for Firebase Firestore/Auth.
 
-const CACHE_NAME = 'checklistfx-pwa-v3';
+const CACHE_NAME = 'checklistfx-pwa-v5';
 const FONT_CACHE_NAME = 'checklistfx-fonts-v1';
 
 const PRECACHE_SHELL = [

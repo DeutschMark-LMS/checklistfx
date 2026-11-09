@@ -3836,27 +3836,79 @@ body.filter-open .filter-sheet {
 
 .sign-btn {
   font-family: var(--font-mono);
-  font-size: 1.1rem;
+  font-size: 1.3rem;
   font-weight: 900;
-  width: 38px;
+  min-width: 48px;
   height: 44px;
   border: none;
   background: transparent;
   color: var(--ink-muted);
   cursor: pointer;
-  transition: background-color 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.15s, opacity 0.15s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.12s;
+}
+
+.sign-btn:active {
+  transform: scale(0.92);
 }
 
 .sign-btn.active.pos,
 .sign-btn.active[data-sign="+"] {
-  background: rgba(16, 185, 129, 0.2);
+  background: rgba(16, 185, 129, 0.25);
   color: var(--success);
+  box-shadow: inset 0 0 12px rgba(16, 185, 129, 0.2);
 }
 
 .sign-btn.active.neg,
 .sign-btn.active[data-sign="-"] {
-  background: rgba(244, 63, 94, 0.2);
+  background: rgba(244, 63, 94, 0.25);
   color: var(--danger);
+  box-shadow: inset 0 0 12px rgba(244, 63, 94, 0.2);
+}
+
+.account-edit-toggle-btn {
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  color: #38bdf8;
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+}
+
+.account-edit-toggle-btn:hover {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.45);
+}
+
+.account-quick-editor {
+  animation: fadeInDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .hero-amount-wrap,
@@ -7181,6 +7233,66 @@ body.filter-open .filter-sheet {
   background: #059669;
   color: #ffffff;
 }
+
+/* ==========================================================================
+   MOBILE & TABLET LANDSCAPE ORIENTATION ADAPTATIONS
+   Ensures seamless viewing, full scrolling, and comfortable touch targets
+   ========================================================================== */
+@media screen and (orientation: landscape) and (max-height: 640px) {
+  .app-header {
+    height: 50px;
+    padding: 0.4rem 1rem;
+  }
+
+  .risk-guardian-hud {
+    padding: 0.45rem 0.85rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .guardian-pillars {
+    gap: 0.4rem;
+  }
+
+  .guardian-pillar-card {
+    padding: 0.35rem 0.5rem;
+  }
+
+  .log-trade-modal {
+    max-height: 94vh;
+    border-radius: 16px;
+  }
+
+  .log-modal-header {
+    padding: 0.55rem 1.15rem;
+  }
+
+  .log-trade-form {
+    padding: 0.65rem 1.15rem 1.5rem;
+    gap: 0.75rem;
+  }
+
+  .profile-modal-card {
+    max-height: 92vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 1rem 1.25rem;
+  }
+
+  .debrief-modal-card {
+    max-height: 92vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pair-direction-grid {
+    gap: 0.5rem;
+  }
+
+  .pnl-entry-container {
+    padding: 0.65rem 0.85rem;
+  }
+}
+
 
 
 

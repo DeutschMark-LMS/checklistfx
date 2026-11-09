@@ -646,7 +646,8 @@ const DMA_DB = {
     if (user && db) {
       try {
         updateCloudSyncIndicator('syncing', 'Syncing...');
-        const playbookId = String(playbook.id || playbook.key || 'custom_' + Date.now());
+        const rawId = playbook.id || playbook.key || ('custom_' + Date.now());
+        const playbookId = String(rawId).replace(/[\/\s]/g, '_');
         const cleanPb = {
           id: playbookId,
           name: String(playbook.name || '').trim(),
@@ -687,9 +688,11 @@ const DMA_DB = {
     // Also save to localStorage
     try {
       const stored = JSON.parse(localStorage.getItem('dma_custom_playbooks') || '[]');
-      const idx = stored.findIndex(p => String(p.id) === String(playbook.id));
-      if (idx >= 0) stored[idx] = playbook;
-      else stored.push(playbook);
+      const targetId = String(playbook.id || playbook.key || '');
+      const idx = stored.findIndex(p => String(p.id) === targetId || String(p.key) === targetId);
+      const updatedItem = { ...(idx >= 0 ? stored[idx] : {}), ...playbook, id: playbook.id ? String(playbook.id) : (targetId || ('custom_' + Date.now())) };
+      if (idx >= 0) stored[idx] = updatedItem;
+      else stored.push(updatedItem);
       localStorage.setItem('dma_custom_playbooks', JSON.stringify(stored));
     } catch (_) {}
 
@@ -706,7 +709,13 @@ const DMA_DB = {
         const pbCol = collection(db, 'users', user.uid, 'playbooks');
         const snap = await getDocs(pbCol);
         const cloudPlaybooks = [];
-        snap.forEach(d => cloudPlaybooks.push(d.data()));
+        snap.forEach(d => {
+          const data = d.data() || {};
+          cloudPlaybooks.push({
+            id: String(data.id || d.id),
+            ...data
+          });
+        });
         if (cloudPlaybooks.length > 0) {
           localStorage.setItem('dma_custom_playbooks', JSON.stringify(cloudPlaybooks));
           return cloudPlaybooks;
@@ -736,7 +745,7 @@ const DMA_DB = {
     }
     try {
       const stored = JSON.parse(localStorage.getItem('dma_custom_playbooks') || '[]');
-      const filtered = stored.filter(p => String(p.id) !== String(playbookId));
+      const filtered = stored.filter(p => String(p.id) !== String(playbookId) && String(p.key) !== String(playbookId));
       localStorage.setItem('dma_custom_playbooks', JSON.stringify(filtered));
     } catch (_) {}
   },
@@ -757,7 +766,13 @@ const DMA_DB = {
 
       // 1. Merge Playbooks (Never wipe local playbooks with empty array)
       const cloudPbs = [];
-      pbSnap.forEach(d => cloudPbs.push(d.data()));
+      pbSnap.forEach(d => {
+        const data = d.data() || {};
+        cloudPbs.push({
+          id: String(data.id || d.id),
+          ...data
+        });
+      });
 
       let localPbs = [];
       try {
@@ -766,8 +781,17 @@ const DMA_DB = {
 
       if (cloudPbs.length > 0) {
         const pbMap = new Map();
-        localPbs.forEach(p => pbMap.set(String(p.id), p));
-        cloudPbs.forEach(p => pbMap.set(String(p.id), p));
+        localPbs.forEach(p => {
+          const pId = String(p.id || p.key || '');
+          if (pId) pbMap.set(pId, { ...p, id: pId });
+        });
+        cloudPbs.forEach(p => {
+          const pId = String(p.id || p.key || '');
+          if (pId) {
+            const existing = pbMap.get(pId) || {};
+            pbMap.set(pId, { ...existing, ...p, id: pId });
+          }
+        });
         const mergedPbs = Array.from(pbMap.values());
         localStorage.setItem('dma_custom_playbooks', JSON.stringify(mergedPbs));
 
@@ -821,10 +845,14 @@ const DMA_DB = {
         });
       }
 
-      // 3. Sync Preferences (Timezone, Trading Style)
+      // 3. Sync Preferences (Timezone, Trading Style, Currency, Accounts)
       try {
         if (uDoc && typeof uDoc.exists === 'function' && uDoc.exists() && uDoc.data().preferences) {
-          localStorage.setItem('dma_user_preferences', JSON.stringify(uDoc.data().preferences));
+          const userPrefs = uDoc.data().preferences;
+          localStorage.setItem('dma_user_preferences', JSON.stringify(userPrefs));
+          if (userPrefs.accounts && Array.isArray(userPrefs.accounts) && userPrefs.accounts.length > 0) {
+            localStorage.setItem('dma_trading_accounts', JSON.stringify(userPrefs.accounts));
+          }
         }
       } catch (_) {}
 

@@ -25,8 +25,8 @@
     }
   </script>
   <!-- Firebase Auth SDK (v12) -->
-  <script type="module" src="firebaseClient.js?v=v2.7"></script>
-  <script src="app.js?v=v2.7" defer></script>
+  <script type="module" src="firebaseClient.js?v=v2.9"></script>
+  <script src="app.js?v=v2.9" defer></script>
   <script src="guardian.js" defer></script>
 </head>
 <body class="app-body profile-page">
@@ -131,6 +131,14 @@
         <div>
           <span class="setting-title">Trading style</span>
           <small id="profile-style-display">Momentum + Breakout</small>
+        </div>
+        <span style="font-size: 0.75rem; color: var(--ink-muted);">Tap to Change &rsaquo;</span>
+      </div>
+
+      <div class="setting-row compact" id="setting-row-account" style="cursor: pointer;" data-action="open-profile-editor">
+        <div>
+          <span class="setting-title">Account size & currency</span>
+          <small id="profile-account-display">$100,000 (USD · 1.0% Risk)</small>
         </div>
         <span style="font-size: 0.75rem; color: var(--ink-muted);">Tap to Change &rsaquo;</span>
       </div>
@@ -265,6 +273,35 @@
           <option value="Scalping">Scalping</option>
           <option value="Swing Trading">Swing Trading</option>
         </select>
+      </div>
+
+      <div class="form-group">
+        <label for="profile-currency">Account currency</label>
+        <select id="profile-currency">
+          <option value="USD">USD ($ - US Dollar)</option>
+          <option value="EUR">EUR (€ - Euro)</option>
+          <option value="GBP">GBP (£ - British Pound)</option>
+          <option value="JPY">JPY (¥ - Japanese Yen)</option>
+          <option value="AUD">AUD (A$ - Australian Dollar)</option>
+          <option value="CAD">CAD (C$ - Canadian Dollar)</option>
+          <option value="CHF">CHF (Fr - Swiss Franc)</option>
+          <option value="NGN">NGN (₦ - Nigerian Naira)</option>
+          <option value="ZAR">ZAR (R - South African Rand)</option>
+          <option value="INR">INR (₹ - Indian Rupee)</option>
+          <option value="SGD">SGD (S$ - Singapore Dollar)</option>
+          <option value="NZD">NZD (NZ$ - New Zealand Dollar)</option>
+          <option value="AED">AED (AED - UAE Dirham)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="profile-account-size">Primary account size</label>
+        <input id="profile-account-size" type="number" placeholder="100000" min="1" step="any" value="100000">
+      </div>
+
+      <div class="form-group">
+        <label for="profile-risk-pct">Default risk per trade (%)</label>
+        <input id="profile-risk-pct" type="number" placeholder="1.0" min="0.01" max="100" step="0.1" value="1.0">
       </div>
 
       <div class="modal-actions">
