@@ -1,8 +1,8 @@
-// Checklist Fx High-Performance Service Worker (v7)
+// Checklist Fx High-Performance Service Worker (v8)
 // Implements Stale-While-Revalidate for app shell, Cache-First for Google Fonts,
-// extensionless path resolution to .html assets, and Network-Only pass-through for Firebase Firestore/Auth.
+// clean URL resolution, and Network-Only pass-through for Firebase Firestore/Auth.
 
-const CACHE_NAME = 'checklistfx-pwa-v7';
+const CACHE_NAME = 'checklistfx-pwa-v8';
 const FONT_CACHE_NAME = 'checklistfx-fonts-v1';
 
 const PRECACHE_SHELL = [
@@ -41,13 +41,20 @@ function getMatchingHtmlPath(urlStr) {
   return './index.html';
 }
 
-// Install: precache essential shell assets
+// Install: precache essential shell assets resiliently
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(PRECACHE_SHELL).catch((err) => {
-        console.warn('[SW] Precache shell asset warning:', err);
-      });
+    caches.open(CACHE_NAME).then(async (cache) => {
+      await Promise.allSettled(
+        PRECACHE_SHELL.map(async (url) => {
+          try {
+            const resp = await fetch(url);
+            if (resp && (resp.status === 200 || resp.type === 'opaque')) {
+              await cache.put(url, resp);
+            }
+          } catch (_) {}
+        })
+      );
     }).then(() => self.skipWaiting())
   );
 });
@@ -98,7 +105,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3. Navigation Requests (HTML Page Transitions): Resilient offline & extensionless handling
+  // 3. Navigation Requests (HTML Page Transitions): Resilient offline & clean URL handling
   if (event.request.mode === 'navigate') {
     event.respondWith(
       (async () => {

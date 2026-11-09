@@ -17,15 +17,15 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=v3.1">
+  <link rel="stylesheet" href="style.css?v=v3.2">
   <!-- Firebase Auth SDK (v12) -->
-  <script type="module" src="firebaseClient.js?v=v3.1"></script>
-  <script src="app.js?v=v3.1" defer></script>
+  <script type="module" src="firebaseClient.js?v=v3.2"></script>
+  <script src="app.js?v=v3.2" defer></script>
 </head>
 <body class="auth-page">
 
   <div class="auth-container">
-    <a href="index.html" class="auth-logo" data-route="/">
+    <a href="/" class="auth-logo" data-route="/">
       <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
       <span>Checklist</span>
     </a>
@@ -82,7 +82,7 @@
         Continue with Google
       </button>
       
-      <p class="auth-footer">Don't have an account? <a href="signup.html" data-route="signup">Sign up</a></p>
+      <p class="auth-footer">Don't have an account? <a href="signup" data-route="signup">Sign up</a></p>
     </div>
   </div>
 
@@ -134,7 +134,7 @@
         if (window.location.protocol === 'file:') return 'app.html';
         const currentUrl = new URL(window.location.href);
         const basePath = currentUrl.pathname.replace(/\/+$/, '').replace(/\/[^/]*$/, '') || '';
-        return `${currentUrl.origin}${basePath}/app.html`;
+        return `${currentUrl.origin}${basePath}/app`;
       };
 
       if (loginForm) {

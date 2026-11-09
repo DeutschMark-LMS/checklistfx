@@ -59,14 +59,17 @@ function safeNavigate(targetHtml, replace = false) {
     window.DMA_NAVIGATE(targetHtml);
     return;
   }
+  let cleanName = targetHtml.replace(/\.html$/i, '').replace(/^\/+/, '');
   if (window.location.protocol === 'file:') {
-    if (replace) window.location.replace(targetHtml);
-    else window.location.href = targetHtml;
+    const fileTarget = cleanName ? `${cleanName}.html` : 'index.html';
+    if (replace) window.location.replace(fileTarget);
+    else window.location.href = fileTarget;
     return;
   }
   const currentUrl = new URL(window.location.href);
   const basePath = currentUrl.pathname.replace(/\/+$/, '').replace(/\/[^/]*$/, '') || '';
-  const resolved = `${currentUrl.origin}${basePath}/${targetHtml}`;
+  const targetPath = cleanName ? `/${cleanName}` : '/';
+  const resolved = `${currentUrl.origin}${basePath}${targetPath}`;
   if (replace) window.location.replace(resolved);
   else window.location.href = resolved;
 }
@@ -145,7 +148,7 @@ function updateCloudSyncIndicator(status, message, details) {
     badge.classList.add('guest');
     badge.title = details || 'Guest Mode: Data saved to this phone only. Tap to Log In and sync to cloud.';
     if (text) text.textContent = message || 'Local Only (Sign In)';
-    badge.onclick = () => { safeNavigate('login.html'); };
+    badge.onclick = () => { safeNavigate('login'); };
   } else if (status === 'offline') {
     badge.classList.add('offline');
     badge.title = details || 'Sync Error: Tap to view diagnostics.';
@@ -435,7 +438,7 @@ const DMA_AUTH = {
         localStorage.setItem('dma_user', JSON.stringify(standardUser));
         localStorage.setItem('dma_active_user', JSON.stringify(standardUser));
 
-        safeNavigate('app.html');
+        safeNavigate('app');
         return { data: { user: standardUser }, error: null };
       } catch (err) {
         console.warn('[DMA Firebase] Google sign-in popup error:', err);
@@ -473,7 +476,7 @@ const DMA_AUTH = {
     localStorage.setItem('checklist-auth', 'true');
     localStorage.setItem('dma_user', JSON.stringify(localUser));
     localStorage.setItem('dma_active_user', JSON.stringify(localUser));
-    safeNavigate('app.html');
+    safeNavigate('app');
     return { data: { user: localUser }, error: null };
   },
 
@@ -491,7 +494,7 @@ const DMA_AUTH = {
       localStorage.removeItem('checklist-auth');
       localStorage.removeItem('dma_user');
       localStorage.removeItem('dma_active_user');
-      safeNavigate('login.html');
+      safeNavigate('login');
     }
   },
 
@@ -937,7 +940,7 @@ if (auth && typeof getRedirectResult === 'function') {
         // If currently on login or signup, navigate directly to app
         const currentPath = (window.location.pathname || '').toLowerCase();
         if (currentPath.endsWith('login.html') || currentPath.endsWith('signup.html') || currentPath.includes('/login') || currentPath.includes('/signup')) {
-          safeNavigate('app.html', true);
+          safeNavigate('app', true);
         }
       }
     })

@@ -17,16 +17,16 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="style.css?v=v3.1">
+  <link rel="stylesheet" href="style.css?v=v3.2">
   <!-- Firebase Auth SDK (v12) -->
-  <script type="module" src="firebaseClient.js?v=v3.1"></script>
-  <script src="app.js?v=v3.1" defer></script>
-  <script src="guardian.js?v=v3.1" defer></script>
+  <script type="module" src="firebaseClient.js?v=v3.2"></script>
+  <script src="app.js?v=v3.2" defer></script>
+  <script src="guardian.js?v=v3.2" defer></script>
 </head>
 <body class="app-body profile-page">
   <header class="app-header profile-header">
     <div class="header-brand">
-      <button class="icon-btn" aria-label="Back" data-route="app.html">
+      <button class="icon-btn" aria-label="Back" data-route="app">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
       </button>
 
@@ -40,7 +40,7 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.694.072-2.126-.521-1.614-.668-2.679-2.316-2.76-2.424-.08-.108-.65-0.865-.65-1.651 0-.786.411-1.173.557-1.332.146-.16.321-.2.428-.2.107 0 .214.001.307.006.099.005.231-.037.362.276.136.324.464 1.134.505 1.217.04.083.067.18.013.288-.054.108-.081.175-.161.27-.08.094-.17.21-.242.282-.08.08-.163.167-.07.327.094.16.417.689.896 1.116.617.549 1.137.72 1.298.8.161.08.255.07.35-.04.094-.109.404-.471.512-.633.108-.161.216-.135.362-.081.147.054.93.439 1.09.52.161.08.269.12.308.187.04.066.04.385-.104.79zM12 2C6.477 2 2 6.477 2 12c0 1.891.524 3.66 1.434 5.176L2 22l4.957-1.398A9.956 9.956 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
         <span>Feedback</span>
       </a>
-      <button class="icon-btn" aria-label="Settings" data-route="profile.html#settings">
+      <button class="icon-btn" aria-label="Settings" data-route="profile#settings">
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.86l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.15V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9.4 19.4a1.7 1.7 0 0 0-1-.6 1.7 1.7 0 0 0-1.15.4l-.06.06A2 2 0 1 1 4.36 16.4l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.15-.4H2.76a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0 .4-1.15V7.76a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 9.4 9a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.15V7.16a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 14.6 9a1.7 1.7 0 0 0 1 .6 1.7 1.7 0 0 0 1.15-.4l.06-.06A2 2 0 1 1 19.64 11.6l-.06.06A1.7 1.7 0 0 0 19.4 13c.2.3.31.66.31 1.02s-.11.72-.31 1.02z"></path></svg>
       </button>
     </div>
@@ -217,7 +217,11 @@
             logoutBtn.disabled = true;
             logoutBtn.textContent = 'Logging out...';
             await window.DMA_AUTH.signOut();
-            window.location.href = 'login.html';
+            if (typeof window.DMA_NAVIGATE === 'function') {
+              window.DMA_NAVIGATE('login');
+            } else {
+              window.location.href = window.location.protocol === 'file:' ? 'login.html' : 'login';
+            }
           });
         }
       }

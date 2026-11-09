@@ -411,22 +411,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const hash = rawTarget.includes('#') ? '#' + rawTarget.split('#')[1] : '';
 
     let cleanName = target.split('/').pop() || 'index';
-    if (!cleanName.includes('.')) {
-      cleanName = `${cleanName}.html`;
-    }
-    if (cleanName === '.html' || cleanName === 'index.html' || target === '/' || target === '') {
-      cleanName = 'index.html';
+    cleanName = cleanName.toLowerCase().replace(/\.html$/i, '');
+    if (cleanName === 'index' || target === '/' || target === '') {
+      cleanName = '';
     }
 
+    // Local file protocol needs .html extension
     if (window.location.protocol === 'file:') {
-      window.location.href = cleanName + search + hash;
+      const fileName = cleanName ? `${cleanName}.html` : 'index.html';
+      window.location.href = fileName + search + hash;
       return;
     }
 
-    // Resolves safely whether current URL is /app, /app/, or /repo/app
+    // Web hosting (Vercel, Firebase) with cleanUrls: use clean extensionless route directly to prevent redirects
     const currentUrl = new URL(window.location.href);
     const basePath = currentUrl.pathname.replace(/\/+$/, '').replace(/\/[^/]*$/, '') || '';
-    window.location.href = `${currentUrl.origin}${basePath}/${cleanName}${search}${hash}`;
+    const targetPath = cleanName ? `/${cleanName}` : '/';
+    const finalUrl = `${currentUrl.origin}${basePath}${targetPath}${search}${hash}`;
+
+    // If already on the target page, just close the drawer
+    const currentClean = currentUrl.pathname.replace(/\.html$/i, '').replace(/\/+$/, '') || '/';
+    const targetClean = (basePath + targetPath).replace(/\/+$/, '') || '/';
+    if (currentClean === targetClean && !hash) {
+      document.body.classList.remove('nav-open');
+      return;
+    }
+
+    window.location.href = finalUrl;
   }
   window.DMA_NAVIGATE = navigateToRoute;
 
@@ -464,7 +475,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const profileButton = document.querySelector('[data-action="profile"]');
   if (profileButton) {
     profileButton.addEventListener('click', () => {
-      navigateToRoute('profile.html');
+      navigateToRoute('profile');
     });
   }
 
@@ -472,7 +483,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (drawerUserInfo) {
     drawerUserInfo.onclick = (e) => {
       e.preventDefault();
-      navigateToRoute('profile.html');
+      navigateToRoute('profile');
     };
   }
 
@@ -733,9 +744,9 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.removeItem('dma_active_user');
       }
       if (typeof navigateToRoute === 'function') {
-        navigateToRoute('login.html');
+        navigateToRoute('login');
       } else {
-        window.location.href = 'login.html';
+        window.location.href = window.location.protocol === 'file:' ? 'login.html' : 'login';
       }
     });
   }
@@ -745,11 +756,11 @@ document.addEventListener('DOMContentLoaded', () => {
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       localStorage.setItem('checklist-auth', 'true');
-      const redir = form.dataset.redirect || 'app.html';
+      const redir = form.dataset.redirect || 'app';
       if (typeof navigateToRoute === 'function') {
         navigateToRoute(redir);
       } else {
-        window.location.href = redir.endsWith('.html') ? redir : `${redir}.html`;
+        window.location.href = window.location.protocol === 'file:' ? (redir.endsWith('.html') ? redir : `${redir}.html`) : redir.replace(/\.html$/i, '');
       }
     });
   });
