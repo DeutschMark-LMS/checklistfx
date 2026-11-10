@@ -1,4 +1,10 @@
 {
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/__/auth/:path*",
+      "destination": "https://dma-trading-checklist.firebaseapp.com/__/auth/:path*"
+    }
+  ]
 }

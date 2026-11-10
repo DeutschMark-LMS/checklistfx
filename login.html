@@ -23,8 +23,8 @@
     (function(){function r(e){if(!e)return"";if(e.startsWith("http://")||e.startsWith("https://")||e.startsWith("mailto:")||e.startsWith("#"))return e;const t=e.split("?")[0].split("#")[0],s=e.includes("?")?"?"+e.split("?")[1].split("#")[0]:"",n=e.includes("#")?"#"+e.split("#")[1]:"";let o=t.split("/").filter(Boolean).pop()||"";o=o.toLowerCase().replace(/\.html$/i,""),("index"===o||"/"===t||""===t)&&(o="");const l="file:"===window.location.protocol,a=window.location.hostname||"",i="localhost"===a||"127.0.0.1"===a||"0.0.0.0"===a||a.endsWith(".local"),c=a.endsWith("github.io"),h=window.location.pathname.toLowerCase().endsWith(".html"),d=l||i||c||h;if(l)return(o?`${o}.html`:"index.html")+s+n;const p=new URL(window.location.href),u=p.pathname.replace(/\/+$/,"").replace(/\/[^/]*$/,"")||"",w=d?o?`/${o}.html`:"/index.html":o?`/${o}`:"/";return`${p.origin}${u}${w}${s}${n}`}function n(e,t=!1){const s=r(e);if(s){if(e.startsWith("http://")||e.startsWith("https://")||e.startsWith("mailto:")||e.startsWith("#"))return void(t?window.location.replace(s):window.location.href=s);const n=new URL(window.location.href),o=new URL(s,window.location.href),l=n.pathname.replace(/\.html$/i,"").replace(/\/+$/,"")||"/",a=o.pathname.replace(/\.html$/i,"").replace(/\/+$/,"")||"/";if(l===a&&n.origin===o.origin&&(!o.hash||o.hash===n.hash))return void document.body.classList.remove("nav-open");t?window.location.replace(s):window.location.href=s}}window.resolveRouteUrl=r,window.DMA_NAVIGATE=n})();
   </script>
   <!-- Firebase Auth SDK (v12) -->
-  <script type="module" src="firebaseClient.js?v=v3.5"></script>
-  <script src="app.js?v=v3.5" defer></script>
+  <script type="module" src="firebaseClient.js?v=v3.6"></script>
+  <script src="app.js?v=v3.6" defer></script>
 </head>
 <body class="auth-page">
 
@@ -103,6 +103,35 @@
       const forgotLink = document.getElementById('forgot-password-link');
       const togglePasswordBtn = document.getElementById('password-toggle-btn');
 
+      const getAppRoute = () => {
+        if (typeof window.resolveRouteUrl === 'function') {
+          return window.resolveRouteUrl('app');
+        }
+        return window.location.protocol === 'file:' ? 'app.html' : 'app.html';
+      };
+
+      // 1. Immediately redirect if already authenticated in local session
+      try {
+        const isAuth = localStorage.getItem('checklist-auth') === 'true';
+        const user = localStorage.getItem('dma_user') || localStorage.getItem('dma_active_user');
+        if (isAuth && user) {
+          showAlert('Signed in! Redirecting to app...', 'success');
+          setTimeout(() => {
+            window.location.replace(getAppRoute());
+          }, 200);
+        }
+      } catch (_) {}
+
+      // 2. Automatically redirect whenever Firebase Auth confirms an active session
+      window.addEventListener('dma-auth-changed', (e) => {
+        if (e.detail) {
+          showAlert('Signed in! Redirecting to app...', 'success');
+          setTimeout(() => {
+            window.location.replace(getAppRoute());
+          }, 200);
+        }
+      });
+
       if (togglePasswordBtn && passwordInput) {
         togglePasswordBtn.addEventListener('click', (e) => {
           e.preventDefault();
@@ -133,13 +162,6 @@
         if (btnText) btnText.textContent = loading ? 'Signing in...' : 'Log in';
         if (btnSpinner) btnSpinner.classList.toggle('hidden', !loading);
       }
-
-      const getAppRoute = () => {
-        if (typeof window.resolveRouteUrl === 'function') {
-          return window.resolveRouteUrl('app');
-        }
-        return window.location.protocol === 'file:' ? 'app.html' : 'app.html';
-      };
 
       if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
@@ -175,13 +197,13 @@
               showAlert('Login successful! Connecting cloud session...', 'success');
               // Ensure Firebase persistence completes before navigating
               setTimeout(() => {
-                window.location.href = getAppRoute();
-              }, 600);
+                window.location.replace(getAppRoute());
+              }, 400);
             }
           } else {
             // Local fallback
             localStorage.setItem('checklist-auth', 'true');
-            window.location.href = getAppRoute();
+            window.location.replace(getAppRoute());
           }
         });
       }
@@ -198,6 +220,11 @@
                 showAlert('Redirecting to Google secure authentication...', 'info');
               } else if (res && res.error) {
                 showAlert(res.error.message || 'Google sign-in was cancelled or failed.', 'error');
+              } else if (res && res.data && res.data.user) {
+                showAlert('Signed in successfully! Redirecting to app...', 'success');
+                setTimeout(() => {
+                  window.location.replace(getAppRoute());
+                }, 300);
               }
             } else {
               const mockUser = {
@@ -208,7 +235,7 @@
               localStorage.setItem('checklist-auth', 'true');
               localStorage.setItem('dma_user', JSON.stringify(mockUser));
               localStorage.setItem('dma_active_user', JSON.stringify(mockUser));
-              window.location.href = getAppRoute();
+              window.location.replace(getAppRoute());
             }
           };
 

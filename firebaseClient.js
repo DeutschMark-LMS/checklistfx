@@ -433,25 +433,16 @@ const DMA_AUTH = {
 
   /**
    * Sign In with Google
-   * - Mobile / PWA: Uses signInWithRedirect to bypass aggressive popup blockers & webview window limits.
-   * - Desktop: Attempts signInWithPopup first; automatically falls back to signInWithRedirect if popup is blocked.
+   * - Universal: Attempts signInWithPopup across mobile and desktop. Modern iOS Safari, Chrome on Android,
+   *   and desktop browsers execute popup authentication inside a top-level window context, which avoids
+   *   the third-party cookie & cross-domain storage partitioning (ITP) issues that cause redirect flows to hang.
+   * - Resilient Fallback: If popups are explicitly blocked by an in-app browser or strict browser setting,
+   *   it falls back seamlessly to signInWithRedirect.
    */
   async signInWithGoogle() {
     if (auth && googleProvider) {
-      // 1. Mobile or Standalone PWA -> redirect flow directly
-      if (this._isMobileOrPWA()) {
-        try {
-          console.info('[DMA Firebase] Mobile/PWA environment detected: initiating signInWithRedirect...');
-          await signInWithRedirect(auth, googleProvider, browserPopupRedirectResolver);
-          return { redirecting: true };
-        } catch (err) {
-          console.warn('[DMA Firebase] signInWithRedirect error:', err);
-          return { data: null, error: { message: translateAuthError(err), original: err } };
-        }
-      }
-
-      // 2. Desktop -> popup flow with automatic redirect fallback
       try {
+        console.info('[DMA Firebase] Initiating Google sign-in via popup...');
         const result = await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
         const standardUser = normalizeUser(result.user);
 
@@ -459,10 +450,10 @@ const DMA_AUTH = {
         localStorage.setItem('dma_user', JSON.stringify(standardUser));
         localStorage.setItem('dma_active_user', JSON.stringify(standardUser));
 
-        safeNavigate('app');
+        safeNavigate('app', true);
         return { data: { user: standardUser }, error: null };
       } catch (err) {
-        console.warn('[DMA Firebase] Google sign-in popup error:', err);
+        console.warn('[DMA Firebase] Google sign-in popup attempt:', err);
         const code = err.code || '';
         if (code === 'auth/popup-closed-by-user') {
           return { data: null, error: { message: 'Google sign-in popup was closed before completing.' } };
@@ -497,7 +488,7 @@ const DMA_AUTH = {
     localStorage.setItem('checklist-auth', 'true');
     localStorage.setItem('dma_user', JSON.stringify(localUser));
     localStorage.setItem('dma_active_user', JSON.stringify(localUser));
-    safeNavigate('app');
+    safeNavigate('app', true);
     return { data: { user: localUser }, error: null };
   },
 
@@ -1084,6 +1075,12 @@ if (auth) {
 
       // Trigger cloud database sync for user
       DMA_DB.syncUserData(user.uid);
+
+      // If user is authenticated and currently on login or signup, automatically route to app
+      const currentPath = (window.location.pathname || '').toLowerCase();
+      if (currentPath.endsWith('login.html') || currentPath.endsWith('signup.html') || currentPath.includes('/login') || currentPath.includes('/signup')) {
+        safeNavigate('app', true);
+      }
 
       // Update UI elements dynamically if on page
       document.querySelectorAll('#drawer-user-avatar, #profile-avatar').forEach(el => {
