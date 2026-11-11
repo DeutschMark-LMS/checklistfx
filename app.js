@@ -3761,7 +3761,7 @@ if (document.readyState === 'loading') {
 
 // ==========================================================================
 // TRADINGVIEW MULTI-TIMEFRAME SCREENSHOT & CHART LINKS MANAGER
-// Supports multiple analysis timeframes (4H HTF, 15M Entry, 1M Execution)
+// Supports multiple analysis timeframes (Daily, 4H, 1H, 30M, 15M, 5M, 1M, Chart)
 // ==========================================================================
 function createScreenshotRow(timeframe = '15M', url = '', canRemove = true) {
   const row = document.createElement('div');
@@ -3773,13 +3773,14 @@ function createScreenshotRow(timeframe = '15M', url = '', canRemove = true) {
   row.innerHTML = `
     <div class="screenshot-tf-select-wrap">
       <select class="screenshot-tf-select" aria-label="Chart Timeframe">
-        <option value="4H"${tf === '4H' ? ' selected' : ''}>4H (HTF)</option>
-        <option value="15M"${tf === '15M' ? ' selected' : ''}>15M (Entry)</option>
-        <option value="1H"${tf === '1H' ? ' selected' : ''}>1H</option>
         <option value="Daily"${tf === 'Daily' ? ' selected' : ''}>Daily</option>
+        <option value="4H"${tf === '4H' ? ' selected' : ''}>4H</option>
+        <option value="1H"${tf === '1H' ? ' selected' : ''}>1H</option>
+        <option value="30M"${tf === '30M' ? ' selected' : ''}>30M</option>
+        <option value="15M"${tf === '15M' ? ' selected' : ''}>15M</option>
         <option value="5M"${tf === '5M' ? ' selected' : ''}>5M</option>
-        <option value="1M"${tf === '1M' ? ' selected' : ''}>1M (Execution)</option>
-        <option value="General"${tf === 'General' || tf === 'Chart' ? ' selected' : ''}>Chart</option>
+        <option value="1M"${tf === '1M' ? ' selected' : ''}>1M</option>
+        <option value="Chart"${tf === 'Chart' || tf === 'General' ? ' selected' : ''}>Chart</option>
       </select>
     </div>
     <div class="screenshot-input-wrap">
@@ -3938,10 +3939,10 @@ async function handleScreenshotPaste(targetInput, targetRow) {
   if (matches && matches.length > 1) {
     targetInput.value = matches[0];
     const container = document.getElementById('screenshot-rows-container');
-    const tfSequence = ['4H', '15M', '1H', 'Daily', '5M', '1M', 'General'];
+    const tfSequence = ['Daily', '4H', '1H', '30M', '15M', '5M', '1M', 'Chart'];
     
     for (let i = 1; i < matches.length; i++) {
-      const nextTf = tfSequence[i % tfSequence.length] || 'General';
+      const nextTf = tfSequence[i % tfSequence.length] || 'Chart';
       if (container) {
         const newRow = createScreenshotRow(nextTf, matches[i], true);
         container.appendChild(newRow);
@@ -3972,8 +3973,8 @@ function addNewScreenshotRow(defaultTf = null, url = '') {
 
   let nextTf = defaultTf;
   if (!nextTf) {
-    const candidateTfs = ['4H', '15M', '1H', 'Daily', '5M', '1M', 'General'];
-    nextTf = candidateTfs.find(t => !usedTfs.includes(t)) || 'General';
+    const candidateTfs = ['Daily', '4H', '1H', '30M', '15M', '5M', '1M', 'Chart'];
+    nextTf = candidateTfs.find(t => !usedTfs.includes(t)) || 'Chart';
   }
 
   const newRow = createScreenshotRow(nextTf, url, true);

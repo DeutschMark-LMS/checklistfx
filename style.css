@@ -4765,6 +4765,7 @@ body.filter-open .filter-sheet {
 
 .screenshot-input-row .screenshot-input-wrap {
   flex: 1;
+  min-width: 0;
 }
 
 .btn-remove-screenshot-row {
