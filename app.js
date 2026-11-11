@@ -1030,6 +1030,32 @@ document.addEventListener('DOMContentLoaded', () => {
       customTo: null
     };
 
+    // Universal Multi-Timeframe Screenshots Normalizer
+    function getTradeScreenshots(trade) {
+      if (!trade) return [];
+      if (Array.isArray(trade.screenshots) && trade.screenshots.length > 0) {
+        return trade.screenshots
+          .map(s => {
+            if (typeof s === 'string') return { url: s.trim(), label: 'Chart', timeframe: 'Chart' };
+            if (s && s.url) return { url: String(s.url).trim(), label: s.label || s.timeframe || 'Chart', timeframe: s.timeframe || s.label || 'Chart' };
+            return null;
+          })
+          .filter(s => s && s.url && (s.url.startsWith('http://') || s.url.startsWith('https://')));
+      }
+      const raw = trade.screenshotUrl || trade.screenshot || '';
+      if (typeof raw === 'string' && raw.trim().length > 0) {
+        const urls = raw.split(/[\n,;]+/).map(u => u.trim()).filter(u => u.startsWith('http://') || u.startsWith('https://'));
+        if (urls.length > 1) {
+          return urls.map((u, i) => ({ url: u, label: `Chart ${i + 1}`, timeframe: `Chart ${i + 1}` }));
+        }
+        if (urls.length === 1) {
+          return [{ url: urls[0], label: 'Chart', timeframe: 'Chart' }];
+        }
+      }
+      return [];
+    }
+    window.getTradeScreenshots = getTradeScreenshots;
+
     // 1. Render custom trades from localStorage
     function buildTradeCard(t, dateAttr) {
       const card = document.createElement('div');
@@ -1108,22 +1134,51 @@ document.addEventListener('DOMContentLoaded', () => {
         : ['4H Key S/R Level or Liquidity Pool swept (MISSED)', '15M Market Structure Shift (MISSED)', 'Order Block or FVG retest (MISSED)', t.breachReason ? `Rule breach: ${t.breachReason}` : 'Chased price prematurely'];
       card.setAttribute('data-confluences', JSON.stringify(t.confluences && t.confluences.length > 0 ? t.confluences : defaultConfluences));
 
-      if (t.screenshotUrl) {
+      const screenshots = getTradeScreenshots(t);
+      if (screenshots.length > 0) {
+        card.setAttribute('data-screenshot', screenshots[0].url);
+        card.setAttribute('data-screenshots', JSON.stringify(screenshots));
+      } else if (t.screenshotUrl) {
         card.setAttribute('data-screenshot', t.screenshotUrl);
       }
       card.setAttribute('data-notes', t.notes || (t.isCompliant ? 'Executed with 100% adherence to trading playbook.' : `Execution violated discipline rules: ${t.breachReason || 'FOMO chase'}`));
 
       const tagBadgesHtml = tags.map(tag => `<span class="psych-tag ${t.isCompliant ? 'good' : 'bad'}">${tag}</span>`).join(' ');
 
-      const screenshotActionHtml = t.screenshotUrl ? `
-        <div class="trade-screenshot-action">
-          <a href="${t.screenshotUrl}" target="_blank" rel="noopener noreferrer" class="btn-view-trade-chart" title="Open TradingView Screenshot" onclick="event.stopPropagation();">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-            <span>VIEW TRADINGVIEW SCREENSHOT</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-          </a>
-        </div>
-      ` : '';
+      let screenshotActionHtml = '';
+      if (screenshots.length === 1) {
+        const s = screenshots[0];
+        const tfLabel = s.label && s.label !== 'Chart' ? `${s.label.toUpperCase()} ` : '';
+        screenshotActionHtml = `
+          <div class="trade-screenshot-action">
+            <a href="${s.url}" target="_blank" rel="noopener noreferrer" class="btn-view-trade-chart" title="Open TradingView Screenshot" onclick="event.stopPropagation();">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+              <span>VIEW ${tfLabel}CHART SCREENSHOT</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            </a>
+          </div>
+        `;
+      } else if (screenshots.length > 1) {
+        const pillsHtml = screenshots.map((s, idx) => {
+          const tfLabel = s.label || s.timeframe || `Chart ${idx + 1}`;
+          return `
+            <a href="${s.url}" target="_blank" rel="noopener noreferrer" class="btn-view-trade-chart-pill" title="Open ${tfLabel} Screenshot" onclick="event.stopPropagation();">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+              <span>${tfLabel}</span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            </a>
+          `;
+        }).join('');
+        screenshotActionHtml = `
+          <div class="trade-screenshot-action multi-charts">
+            <div class="multi-charts-header">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+              <span class="multi-charts-label">CHARTS (${screenshots.length}):</span>
+            </div>
+            <div class="multi-charts-pills">${pillsHtml}</div>
+          </div>
+        `;
+      }
 
       const lessonsText = debrief.lessons || (t.retrospective || (t.notes && !t.notes.includes('100% adherence') && !t.notes.includes('Rule breach') ? t.notes : ''));
       const retrospectiveHtml = lessonsText ? `<div class="trade-retrospective-snippet">"${lessonsText}"</div>` : '';
@@ -1703,7 +1758,20 @@ document.addEventListener('DOMContentLoaded', () => {
       const setupName = card.querySelector('.setup-name')?.textContent || card.getAttribute('data-setup') || 'A+ Playbook Setup';
       const timeText = card.querySelector('.time')?.textContent || card.getAttribute('data-time') || 'Today';
       const notes = card.getAttribute('data-notes') || 'No additional retrospective notes recorded for this trade.';
-      const screenshot = card.getAttribute('data-screenshot') || card.querySelector('.btn-view-trade-chart')?.getAttribute('href');
+      
+      let screenshotsList = [];
+      const rawScreenshotsAttr = card.getAttribute('data-screenshots');
+      if (rawScreenshotsAttr) {
+        try {
+          screenshotsList = JSON.parse(rawScreenshotsAttr);
+        } catch (_) {}
+      }
+      if (!Array.isArray(screenshotsList) || screenshotsList.length === 0) {
+        const singleUrl = card.getAttribute('data-screenshot') || card.querySelector('.btn-view-trade-chart')?.getAttribute('href') || card.querySelector('.btn-view-trade-chart-pill')?.getAttribute('href');
+        if (singleUrl && (singleUrl.startsWith('http://') || singleUrl.startsWith('https://'))) {
+          screenshotsList = [{ url: singleUrl, label: 'Chart', timeframe: 'Chart' }];
+        }
+      }
 
       let tags = [];
       try {
@@ -1809,12 +1877,54 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (tvPreviewEl) {
-        if (screenshot && screenshot.trim().length > 0) {
+        const tvHeadingEl = document.getElementById('inspector-tv-heading');
+        const tvListEl = document.getElementById('inspector-tv-list');
+        const tvSingleFallbackEl = document.getElementById('inspector-tv-single-fallback');
+
+        if (screenshotsList.length > 0) {
           tvPreviewEl.style.display = 'block';
-          if (tvUrlTextEl) tvUrlTextEl.textContent = screenshot;
-          if (openTvBtnEl) openTvBtnEl.href = screenshot;
+          if (tvHeadingEl) {
+            tvHeadingEl.textContent = screenshotsList.length > 1 
+              ? `TradingView Chart Snapshots (${screenshotsList.length})` 
+              : 'TradingView Chart Snapshot';
+          }
+          if (tvListEl) {
+            if (screenshotsList.length > 1) {
+              tvListEl.style.display = 'flex';
+              tvListEl.innerHTML = screenshotsList.map((s, idx) => {
+                const tf = s.label || s.timeframe || `Chart ${idx + 1}`;
+                const cleanUrl = s.url;
+                const displayUrl = cleanUrl.length > 38 ? cleanUrl.substring(0, 36) + '...' : cleanUrl;
+                return `
+                  <div class="inspector-tv-item">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; min-width: 0; flex: 1;">
+                      <span class="inspector-tf-badge">${tf}</span>
+                      <span class="inspector-tv-url" title="${cleanUrl}">${displayUrl}</span>
+                    </div>
+                    <a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="btn-open-tv-ext" title="Open ${tf} Chart">
+                      <span>Open</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                    </a>
+                  </div>
+                `;
+              }).join('');
+              if (tvSingleFallbackEl) tvSingleFallbackEl.style.display = 'none';
+            } else {
+              tvListEl.style.display = 'none';
+              tvListEl.innerHTML = '';
+              if (tvSingleFallbackEl) {
+                tvSingleFallbackEl.style.display = 'flex';
+                if (tvUrlTextEl) tvUrlTextEl.textContent = screenshotsList[0].url;
+                if (openTvBtnEl) openTvBtnEl.href = screenshotsList[0].url;
+              }
+            }
+          } else {
+            if (tvUrlTextEl) tvUrlTextEl.textContent = screenshotsList[0].url;
+            if (openTvBtnEl) openTvBtnEl.href = screenshotsList[0].url;
+          }
         } else {
           tvPreviewEl.style.display = 'none';
+          if (tvListEl) tvListEl.innerHTML = '';
         }
       }
 
@@ -1860,7 +1970,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     journalList.addEventListener('click', (e) => {
-      if (e.target.closest('.trade-screenshot-action') || e.target.closest('.btn-view-trade-chart')) {
+      if (e.target.closest('.trade-screenshot-action') || e.target.closest('.btn-view-trade-chart') || e.target.closest('.btn-view-trade-chart-pill')) {
         return;
       }
       const card = e.target.closest('.trade-card');
@@ -1966,7 +2076,19 @@ document.addEventListener('DOMContentLoaded', () => {
           const compliance = card.getAttribute('data-compliance') === 'true' || card.classList.contains('followed') ? '"FOLLOWED"' : '"BROKEN"';
           const met = `"${card.getAttribute('data-confluences-met') || ''}"`;
           const total = `"${card.getAttribute('data-confluences-total') || ''}"`;
-          const screenshot = `"${(card.getAttribute('data-screenshot') || card.querySelector('.btn-view-trade-chart')?.getAttribute('href') || '').replace(/"/g, '""')}"`;
+          let screenshot = '';
+          const sJson = card.getAttribute('data-screenshots');
+          if (sJson) {
+            try {
+              const parsed = JSON.parse(sJson);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                screenshot = `"${parsed.map(p => `[${p.label || p.timeframe || 'Chart'}] ${p.url}`).join(' | ').replace(/"/g, '""')}"`;
+              }
+            } catch (_) {}
+          }
+          if (!screenshot) {
+            screenshot = `"${(card.getAttribute('data-screenshot') || card.querySelector('.btn-view-trade-chart')?.getAttribute('href') || card.querySelector('.btn-view-trade-chart-pill')?.getAttribute('href') || '').replace(/"/g, '""')}"`;
+          }
           const notes = `"${(card.getAttribute('data-notes') || '').replace(/"/g, '""')}"`;
 
           rows.push([id, time, asset, direction, setup, outcome, pnlVal, rmult, compliance, met, total, screenshot, notes].join(','));
@@ -3101,6 +3223,10 @@ function openLogTradeModal() {
   if (typeof updateAccountImpactReadout === 'function') {
     updateAccountImpactReadout();
   }
+
+  if (typeof resetScreenshotInputs === 'function') {
+    resetScreenshotInputs();
+  }
 }
 
 function closeLogTradeModal() {
@@ -3633,52 +3759,324 @@ if (document.readyState === 'loading') {
   initQuickAccountEditor();
 }
 
-// TradingView Screenshot Preview & Paste
-const tvScreenshotInput = document.getElementById('trade-screenshot-url');
-const pasteTvBtn = document.getElementById('paste-tv-btn');
-const tvPreviewCapsule = document.getElementById('screenshot-preview-capsule');
-const tvExternalLink = document.getElementById('screenshot-external-link');
-const tvPreviewText = document.getElementById('preview-url-text');
+// ==========================================================================
+// TRADINGVIEW MULTI-TIMEFRAME SCREENSHOT & CHART LINKS MANAGER
+// Supports multiple analysis timeframes (4H HTF, 15M Entry, 1M Execution)
+// ==========================================================================
+function createScreenshotRow(timeframe = '15M', url = '', canRemove = true) {
+  const row = document.createElement('div');
+  row.className = 'screenshot-input-row';
+  
+  const tf = timeframe || '15M';
+  const cleanUrl = url ? String(url).trim() : '';
 
-function updateTvPreview(url) {
-  const cleanUrl = (url || '').trim();
+  row.innerHTML = `
+    <div class="screenshot-tf-select-wrap">
+      <select class="screenshot-tf-select" aria-label="Chart Timeframe">
+        <option value="4H"${tf === '4H' ? ' selected' : ''}>4H (HTF)</option>
+        <option value="15M"${tf === '15M' ? ' selected' : ''}>15M (Entry)</option>
+        <option value="1H"${tf === '1H' ? ' selected' : ''}>1H</option>
+        <option value="Daily"${tf === 'Daily' ? ' selected' : ''}>Daily</option>
+        <option value="5M"${tf === '5M' ? ' selected' : ''}>5M</option>
+        <option value="1M"${tf === '1M' ? ' selected' : ''}>1M (Execution)</option>
+        <option value="General"${tf === 'General' || tf === 'Chart' ? ' selected' : ''}>Chart</option>
+      </select>
+    </div>
+    <div class="screenshot-input-wrap">
+      <div class="tv-icon-prefix">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+        </svg>
+      </div>
+      <input 
+        type="url" 
+        class="screenshot-url-input" 
+        placeholder="e.g. https://www.tradingview.com/x/ABC12345/"
+        value="${cleanUrl.replace(/"/g, '&quot;')}"
+        autocomplete="off"
+        spellcheck="false"
+      >
+      <button type="button" class="btn-paste-tv" title="Paste from clipboard">PASTE</button>
+    </div>
+    ${canRemove ? `
+    <button type="button" class="btn-remove-screenshot-row" title="Remove this timeframe link" aria-label="Remove link">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </button>` : ''}
+  `;
+
+  return row;
+}
+
+function getCollectedScreenshots() {
+  const container = document.getElementById('screenshot-rows-container');
+  if (!container) return [];
+  const rows = container.querySelectorAll('.screenshot-input-row');
+  const results = [];
+  rows.forEach(r => {
+    const sel = r.querySelector('.screenshot-tf-select');
+    const inp = r.querySelector('.screenshot-url-input');
+    const tf = sel ? sel.value : 'Chart';
+    const url = inp ? inp.value.trim() : '';
+    if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+      results.push({ url, label: tf, timeframe: tf });
+    }
+  });
+  return results;
+}
+window.getCollectedScreenshots = getCollectedScreenshots;
+
+function updateScreenshotRowButtons() {
+  const container = document.getElementById('screenshot-rows-container');
+  if (!container) return;
+  const rows = container.querySelectorAll('.screenshot-input-row');
+  
+  rows.forEach((row, idx) => {
+    const input = row.querySelector('.screenshot-url-input');
+    if (input) {
+      if (idx === 0) {
+        input.id = 'trade-screenshot-url';
+      } else if (input.id === 'trade-screenshot-url') {
+        input.removeAttribute('id');
+      }
+    }
+
+    let removeBtn = row.querySelector('.btn-remove-screenshot-row');
+    if (rows.length > 1) {
+      if (!removeBtn) {
+        removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn-remove-screenshot-row';
+        removeBtn.title = 'Remove this timeframe link';
+        removeBtn.setAttribute('aria-label', 'Remove link');
+        removeBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+        row.appendChild(removeBtn);
+      }
+    } else {
+      if (removeBtn) {
+        removeBtn.remove();
+      }
+    }
+  });
+}
+
+function updateScreenshotPreviews() {
+  const previewsContainer = document.getElementById('screenshot-previews-list');
+  const countBadge = document.getElementById('screenshot-count-badge');
+  const collected = getCollectedScreenshots();
+
+  if (countBadge) {
+    if (collected.length === 0) {
+      countBadge.textContent = 'CHART LINKS';
+    } else if (collected.length === 1) {
+      countBadge.textContent = '1 LINK';
+    } else {
+      countBadge.textContent = `${collected.length} LINKS`;
+    }
+  }
+
+  // Also update legacy single-preview capsule if present
+  const tvPreviewCapsule = document.getElementById('screenshot-preview-capsule');
+  const tvExternalLink = document.getElementById('screenshot-external-link');
+  const tvPreviewText = document.getElementById('preview-url-text');
   if (tvPreviewCapsule) {
-    if (cleanUrl && (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://'))) {
+    if (collected.length > 0) {
       tvPreviewCapsule.style.display = 'flex';
-      if (tvExternalLink) tvExternalLink.href = cleanUrl;
-      if (tvPreviewText) tvPreviewText.textContent = cleanUrl.length > 34 ? cleanUrl.substring(0, 32) + '...' : cleanUrl;
+      if (tvExternalLink) tvExternalLink.href = collected[0].url;
+      if (tvPreviewText) tvPreviewText.textContent = collected[0].url.length > 34 ? collected[0].url.substring(0, 32) + '...' : collected[0].url;
     } else {
       tvPreviewCapsule.style.display = 'none';
     }
   }
-}
 
-if (tvScreenshotInput) {
-  tvScreenshotInput.addEventListener('input', (e) => {
-    updateTvPreview(e.target.value);
-  });
-}
+  if (!previewsContainer) return;
 
-if (pasteTvBtn && tvScreenshotInput) {
-  pasteTvBtn.addEventListener('click', async () => {
-    try {
-      if (navigator.clipboard && navigator.clipboard.readText) {
-        const text = await navigator.clipboard.readText();
-        if (text) {
-          tvScreenshotInput.value = text.trim();
-          updateTvPreview(text.trim());
-          return;
-        }
+  if (collected.length === 0) {
+    previewsContainer.style.display = 'none';
+    previewsContainer.innerHTML = '';
+    return;
+  }
+
+  previewsContainer.style.display = 'flex';
+  previewsContainer.innerHTML = collected.map(item => {
+    const cleanUrl = item.url;
+    const displayUrl = cleanUrl.length > 38 ? cleanUrl.substring(0, 36) + '...' : cleanUrl;
+    return `
+      <div class="screenshot-preview-capsule">
+        <div class="preview-info">
+          <span class="inspector-tf-badge" style="font-size:0.65rem; padding: 0.1rem 0.4rem;">${item.label}</span>
+          <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${displayUrl}</span>
+        </div>
+        <a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="preview-open-link" title="Open ${item.label} snapshot">
+          <span>Open</span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+        </a>
+      </div>
+    `;
+  }).join('');
+}
+window.updateScreenshotPreviews = updateScreenshotPreviews;
+
+async function handleScreenshotPaste(targetInput, targetRow) {
+  let text = '';
+  try {
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      text = await navigator.clipboard.readText();
+    }
+  } catch (err) {
+    console.warn('Clipboard read failed', err);
+  }
+  if (!text) {
+    text = prompt('Paste TradingView snapshot link(s):') || '';
+  }
+  text = text.trim();
+  if (!text) return;
+
+  const urlRegex = /(https?:\/\/[^\s,;]+)/g;
+  const matches = text.match(urlRegex);
+
+  if (matches && matches.length > 1) {
+    targetInput.value = matches[0];
+    const container = document.getElementById('screenshot-rows-container');
+    const tfSequence = ['4H', '15M', '1H', 'Daily', '5M', '1M', 'General'];
+    
+    for (let i = 1; i < matches.length; i++) {
+      const nextTf = tfSequence[i % tfSequence.length] || 'General';
+      if (container) {
+        const newRow = createScreenshotRow(nextTf, matches[i], true);
+        container.appendChild(newRow);
       }
-    } catch (e) {
-      console.warn('Clipboard read failed', e);
     }
-    const manual = prompt('Paste TradingView snapshot link:');
-    if (manual) {
-      tvScreenshotInput.value = manual.trim();
-      updateTvPreview(manual.trim());
+    updateScreenshotRowButtons();
+    updateScreenshotPreviews();
+    if (typeof showAppToast === 'function') {
+      showAppToast({
+        title: 'Multi-Links Imported',
+        message: `Extracted ${matches.length} timeframe chart links into your checklist.`,
+        type: 'info',
+        duration: 3500
+      });
     }
-  });
+  } else {
+    targetInput.value = (matches && matches[0]) ? matches[0] : text;
+    updateScreenshotPreviews();
+  }
+}
+
+function addNewScreenshotRow(defaultTf = null, url = '') {
+  const container = document.getElementById('screenshot-rows-container');
+  if (!container) return;
+
+  const existingRows = container.querySelectorAll('.screenshot-input-row');
+  const usedTfs = Array.from(existingRows).map(r => r.querySelector('.screenshot-tf-select')?.value);
+
+  let nextTf = defaultTf;
+  if (!nextTf) {
+    const candidateTfs = ['4H', '15M', '1H', 'Daily', '5M', '1M', 'General'];
+    nextTf = candidateTfs.find(t => !usedTfs.includes(t)) || 'General';
+  }
+
+  const newRow = createScreenshotRow(nextTf, url, true);
+  container.appendChild(newRow);
+  updateScreenshotRowButtons();
+
+  const input = newRow.querySelector('.screenshot-url-input');
+  if (input) input.focus();
+
+  updateScreenshotPreviews();
+}
+window.addNewScreenshotRow = addNewScreenshotRow;
+
+function resetScreenshotInputs(initialScreenshots = null) {
+  const container = document.getElementById('screenshot-rows-container');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  if (Array.isArray(initialScreenshots) && initialScreenshots.length > 0) {
+    initialScreenshots.forEach((item, idx) => {
+      const tf = item.label || item.timeframe || '15M';
+      const url = item.url || (typeof item === 'string' ? item : '');
+      const row = createScreenshotRow(tf, url, initialScreenshots.length > 1);
+      container.appendChild(row);
+    });
+  } else if (typeof initialScreenshots === 'string' && initialScreenshots.trim().length > 0) {
+    const row = createScreenshotRow('15M', initialScreenshots.trim(), false);
+    container.appendChild(row);
+  } else {
+    const defaultRow = createScreenshotRow('15M', '', false);
+    container.appendChild(defaultRow);
+  }
+
+  updateScreenshotRowButtons();
+  updateScreenshotPreviews();
+}
+window.resetScreenshotInputs = resetScreenshotInputs;
+
+function initScreenshotInputsManager() {
+  const container = document.getElementById('screenshot-rows-container');
+  const addBtn = document.getElementById('add-screenshot-link-btn');
+
+  if (addBtn && !addBtn.hasAttribute('data-bound')) {
+    addBtn.setAttribute('data-bound', 'true');
+    addBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      addNewScreenshotRow();
+    });
+  }
+
+  if (container && !container.hasAttribute('data-bound')) {
+    container.setAttribute('data-bound', 'true');
+
+    container.addEventListener('input', (e) => {
+      if (e.target.classList.contains('screenshot-url-input')) {
+        updateScreenshotPreviews();
+      }
+    });
+
+    container.addEventListener('change', (e) => {
+      if (e.target.classList.contains('screenshot-tf-select')) {
+        updateScreenshotPreviews();
+      }
+    });
+
+    container.addEventListener('click', (e) => {
+      const pasteBtn = e.target.closest('.btn-paste-tv');
+      if (pasteBtn) {
+        e.preventDefault();
+        const row = pasteBtn.closest('.screenshot-input-row');
+        const input = row?.querySelector('.screenshot-url-input');
+        if (input && row) {
+          handleScreenshotPaste(input, row);
+        }
+        return;
+      }
+
+      const removeBtn = e.target.closest('.btn-remove-screenshot-row');
+      if (removeBtn) {
+        e.preventDefault();
+        const row = removeBtn.closest('.screenshot-input-row');
+        const allRows = container.querySelectorAll('.screenshot-input-row');
+        if (allRows.length <= 1) {
+          const input = row?.querySelector('.screenshot-url-input');
+          if (input) input.value = '';
+        } else if (row) {
+          row.remove();
+        }
+        updateScreenshotRowButtons();
+        updateScreenshotPreviews();
+      }
+    });
+  }
+
+  updateScreenshotRowButtons();
+  updateScreenshotPreviews();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initScreenshotInputsManager);
+} else {
+  initScreenshotInputsManager();
 }
 
 // Debrief & Retrospective Controls in Log Trade Modal
@@ -3758,7 +4156,12 @@ if (logTradeForm) {
       rMultiple = pnlFinal >= 0 ? '+2.0R' : '-1.0R';
     }
 
-    const screenshotUrl = document.getElementById('trade-screenshot-url')?.value?.trim() || '';
+    const collectedScreenshots = (typeof getCollectedScreenshots === 'function')
+      ? getCollectedScreenshots()
+      : [];
+    const screenshotUrl = collectedScreenshots.length > 0
+      ? collectedScreenshots[0].url
+      : (document.getElementById('trade-screenshot-url')?.value?.trim() || '');
     const breachReasonSelect = document.getElementById('breach-reason-select');
     const breachReason = (!isCompliant && breachReasonSelect) ? breachReasonSelect.value : '';
 
@@ -3805,6 +4208,7 @@ if (logTradeForm) {
       isCompliant,
       breachReason,
       screenshotUrl,
+      screenshots: collectedScreenshots,
       debrief: debriefData,
       retrospective: debriefLessons,
       notes: debriefLessons || (isCompliant ? 'Executed with 100% adherence to playbook confluences.' : `Rule breach detected: ${breachReason || 'Confluences missed'}`),
@@ -3903,6 +4307,7 @@ function saveTradeDraft() {
     pnl: pnlInput ? pnlInput.value : '',
     pnlSign: activePnlSign || '+',
     screenshot: screenshotInput ? screenshotInput.value : '',
+    screenshots: (typeof getCollectedScreenshots === 'function') ? getCollectedScreenshots() : [],
     grade: typeof activeLogGrade !== 'undefined' ? activeLogGrade : 'A+',
     gradeTitle: typeof activeLogGradeTitle !== 'undefined' ? activeLogGradeTitle : '',
     emotion: typeof activeLogEmotion !== 'undefined' ? activeLogEmotion : 'Calm & Patient',
@@ -3974,6 +4379,15 @@ function restoreTradeDraft() {
 
     const screenshotInput = document.getElementById('trade-screenshot-url');
     if (screenshotInput && draft.screenshot) screenshotInput.value = draft.screenshot;
+    if (draft.screenshots && Array.isArray(draft.screenshots) && draft.screenshots.length > 0) {
+      if (typeof resetScreenshotInputs === 'function') {
+        resetScreenshotInputs(draft.screenshots);
+      }
+    } else if (draft.screenshot) {
+      if (typeof resetScreenshotInputs === 'function') {
+        resetScreenshotInputs([{ url: draft.screenshot, label: '15M', timeframe: '15M' }]);
+      }
+    }
 
     const lessonsInput = document.getElementById('log-debrief-lessons-input');
     if (lessonsInput && draft.lessons) lessonsInput.value = draft.lessons;

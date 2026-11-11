@@ -423,41 +423,55 @@
         </div>
       </div>
 
-      <!-- TradingView Screenshot / Chart Link Field -->
+      <!-- TradingView Screenshot / Multi-Timeframe Chart Links -->
       <div class="creator-input-group log-screenshot-group">
         <div class="card-header-flex" style="margin-bottom: 0.35rem;">
-          <span class="sub-label">TRADINGVIEW SCREENSHOT</span>
-          <span class="tv-badge">CHART LINK</span>
-        </div>
-        <div class="screenshot-input-wrap">
-          <div class="tv-icon-prefix">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-            </svg>
+          <div style="display: flex; align-items: center; gap: 0.45rem;">
+            <span class="sub-label">TRADINGVIEW SCREENSHOTS</span>
+            <span class="tv-badge" id="screenshot-count-badge">CHART LINKS</span>
           </div>
-          <input 
-            type="url" 
-            class="screenshot-url-input" 
-            id="trade-screenshot-url" 
-            placeholder="e.g. https://www.tradingview.com/x/ABC12345/"
-            autocomplete="off"
-            spellcheck="false"
-          >
-          <button type="button" class="btn-paste-tv" id="paste-tv-btn" title="Paste from clipboard">PASTE</button>
+          <button type="button" class="btn-add-screenshot-link" id="add-screenshot-link-btn" title="Add another timeframe chart link">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>+ Add Timeframe Link</span>
+          </button>
+        </div>
+
+        <!-- Container for dynamic timeframe screenshot rows -->
+        <div class="screenshot-rows-container" id="screenshot-rows-container">
+          <div class="screenshot-input-row" data-row-idx="0">
+            <div class="screenshot-tf-select-wrap">
+              <select class="screenshot-tf-select" aria-label="Chart Timeframe">
+                <option value="4H">4H (HTF)</option>
+                <option value="15M" selected>15M (Entry)</option>
+                <option value="1H">1H</option>
+                <option value="Daily">Daily</option>
+                <option value="5M">5M</option>
+                <option value="1M">1M (Execution)</option>
+                <option value="General">Chart</option>
+              </select>
+            </div>
+            <div class="screenshot-input-wrap">
+              <div class="tv-icon-prefix">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                </svg>
+              </div>
+              <input 
+                type="url" 
+                class="screenshot-url-input" 
+                id="trade-screenshot-url" 
+                placeholder="e.g. https://www.tradingview.com/x/ABC12345/"
+                autocomplete="off"
+                spellcheck="false"
+              >
+              <button type="button" class="btn-paste-tv" id="paste-tv-btn" title="Paste from clipboard">PASTE</button>
+            </div>
+          </div>
         </div>
         
-        <!-- Live TradingView Preview Capsule -->
-        <div class="screenshot-preview-capsule" id="screenshot-preview-capsule" style="display: none;">
-          <div class="preview-info">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            <span id="preview-url-text">Snapshot attached</span>
-          </div>
-          <a id="screenshot-external-link" href="#" target="_blank" rel="noopener noreferrer" class="preview-open-link">
-            <span>Open Chart</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-          </a>
-        </div>
+        <!-- Live TradingView Previews Capsule List -->
+        <div class="screenshot-previews-list" id="screenshot-previews-list" style="display: none;"></div>
       </div>
 
       <!-- POST-TRADE DEBRIEF & AUDIT RETROSPECTIVE SECTION (CALM MIND REFLECTION) -->
